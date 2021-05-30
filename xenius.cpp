@@ -170,7 +170,7 @@ int main(
         catch( E57Exception & exception_ )
         {
             cerr
-                << "Error:"
+                << "Error :"
                 << endl;
 
             exception_.report( __FILE__, __LINE__, __FUNCTION__ );
@@ -186,7 +186,7 @@ int main(
         catch ( ... )
         {
             cerr
-                << "Unknown error."
+                << "Error."
                 << endl;
         }
     }
