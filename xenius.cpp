@@ -35,20 +35,10 @@ struct VECTOR_3
 {
     // -- ATTRIBUTES
 
-    double
+    float
         X,
         Y,
         Z;
-
-    // -- CONSTRUCTORS
-
-    VECTOR_3(
-        )
-    {
-        X = 0.0;
-        Y = 0.0;
-        Z = 0.0;
-    }
 
     // -- OPERATIONS
 
@@ -85,7 +75,7 @@ struct VECTOR_3
 
     void AddScaledVector(
         const VECTOR_3 & vector,
-        double factor
+        float factor
         )
     {
         X += vector.X * factor;
@@ -96,7 +86,7 @@ struct VECTOR_3
     // ~~
 
     void MultiplyScalar(
-        double scalar
+        float scalar
         )
     {
         X *= scalar;
@@ -107,9 +97,9 @@ struct VECTOR_3
     // ~~
 
     void Translate(
-        double x_translation,
-        double y_translation,
-        double z_translation
+        float x_translation,
+        float y_translation,
+        float z_translation
         )
     {
         X += x_translation;
@@ -120,9 +110,9 @@ struct VECTOR_3
     // ~~
 
     void Scale(
-        double x_scaling,
-        double y_scaling,
-        double z_scaling
+        float x_scaling,
+        float y_scaling,
+        float z_scaling
         )
     {
         X *= x_scaling;
@@ -133,11 +123,11 @@ struct VECTOR_3
     // ~~
 
     void RotateAroundX(
-        double x_angle_cosinus,
-        double x_angle_sinus
+        float x_angle_cosinus,
+        float x_angle_sinus
         )
     {
-        double
+        float
             y;
 
         y = Y;
@@ -148,11 +138,11 @@ struct VECTOR_3
     // ~~
 
     void RotateAroundY(
-        double y_angle_cosinus,
-        double y_angle_sinus
+        float y_angle_cosinus,
+        float y_angle_sinus
         )
     {
-        double
+        float
             x;
 
         x = X;
@@ -163,11 +153,11 @@ struct VECTOR_3
     // ~~
 
     void RotateAroundZ(
-        double z_angle_cosinus,
-        double z_angle_sinus
+        float z_angle_cosinus,
+        float z_angle_sinus
         )
     {
-        double
+        float
             x,
             y;
 
@@ -183,22 +173,11 @@ struct VECTOR_4
 {
     // -- ATTRIBUTES
 
-    double
+    float
         X,
         Y,
         Z,
         W;
-
-    // -- CONSTRUCTORS
-
-    VECTOR_4(
-        )
-    {
-        X = 0.0;
-        Y = 0.0;
-        Z = 0.0;
-        W = 0.0;
-    }
 
     // -- OPERATIONS
 
@@ -237,7 +216,7 @@ struct VECTOR_4
     // ~~
 
     void MultiplyScalar(
-        double scalar
+        float scalar
         )
     {
         X *= scalar;
@@ -249,10 +228,10 @@ struct VECTOR_4
     // ~~
 
     void Translate(
-        double x_translation,
-        double y_translation,
-        double z_translation,
-        double w_translation
+        float x_translation,
+        float y_translation,
+        float z_translation,
+        float w_translation
         )
     {
         X += x_translation;
@@ -264,16 +243,50 @@ struct VECTOR_4
     // ~~
 
     void Scale(
-        double x_scaling,
-        double y_scaling,
-        double z_scaling,
-        double w_scaling
+        float x_scaling,
+        float y_scaling,
+        float z_scaling,
+        float w_scaling
         )
     {
         X *= x_scaling;
         Y *= y_scaling;
         Z *= z_scaling;
         W *= w_scaling;
+    }
+};
+
+// ~~
+
+struct TRANSFORM
+{
+    // -- ATTRIBUTES
+
+    VECTOR_3
+        PositionOffsetVector,
+        PositionRotationVector,
+        PositionScalingVector,
+        PositionTranslationVector;
+    VECTOR_4
+        ColorOffsetVector,
+        ColorScalingVector,
+        ColorTranslationVector;
+    int64_t
+        DecimationCount;
+
+    // -- CONSTRUCTORS
+
+    TRANSFORM(
+        )
+    {
+        PositionOffsetVector.SetNull();
+        PositionRotationVector.SetNull();
+        PositionScalingVector.SetUnit();
+        PositionTranslationVector.SetNull();
+        ColorOffsetVector.SetNull();
+        ColorScalingVector.SetUnit();
+        ColorTranslationVector.SetNull();
+        DecimationCount = 1;
     }
 };
 
@@ -288,16 +301,19 @@ struct POINT
     VECTOR_4
         ColorVector;
 
+    // -- CONSTRUCTORS
+
+    POINT(
+        )
+    {
+        PositionVector.SetNull();
+        ColorVector.SetNull();
+    }
+
     // -- INQUIRIES
 
     POINT GetTransformedPoint(
-        const VECTOR_3 & position_offset_vector,
-        const VECTOR_3 & position_scaling_vector,
-        const VECTOR_3 & position_rotation_vector,
-        const VECTOR_3 & position_translation_vector,
-        const VECTOR_4 & color_offset_vector,
-        const VECTOR_4 & color_scaling_vector,
-        const VECTOR_4 & color_translation_vector
+        const TRANSFORM & transform
         ) const
     {
         POINT
@@ -306,109 +322,290 @@ struct POINT
         transformed_point = *this;
 
         transformed_point.PositionVector.Translate(
-            position_offset_vector.X,
-            position_offset_vector.Y,
-            position_offset_vector.Z
+            transform.PositionOffsetVector.X,
+            transform.PositionOffsetVector.Y,
+            transform.PositionOffsetVector.Z
             );
 
         transformed_point.PositionVector.Scale(
-            position_scaling_vector.X,
-            position_scaling_vector.Y,
-            position_scaling_vector.Z
+            transform.PositionScalingVector.X,
+            transform.PositionScalingVector.Y,
+            transform.PositionScalingVector.Z
             );
 
-        if ( position_rotation_vector.Z != 0.0 )
+        if ( transform.PositionRotationVector.Z != 0.0 )
         {
             transformed_point.PositionVector.RotateAroundZ(
-                cos( position_rotation_vector.Z ),
-                sin( position_rotation_vector.Z )
+                cos( transform.PositionRotationVector.Z ),
+                sin( transform.PositionRotationVector.Z )
                 );
         }
 
-        if ( position_rotation_vector.X != 0.0 )
+        if ( transform.PositionRotationVector.X != 0.0 )
         {
             transformed_point.PositionVector.RotateAroundX(
-                cos( position_rotation_vector.X ),
-                sin( position_rotation_vector.X )
+                cos( transform.PositionRotationVector.X ),
+                sin( transform.PositionRotationVector.X )
                 );
         }
 
-        if ( position_rotation_vector.Y != 0.0 )
+        if ( transform.PositionRotationVector.Y != 0.0 )
         {
             transformed_point.PositionVector.RotateAroundY(
-                cos( position_rotation_vector.Y ),
-                sin( position_rotation_vector.Y )
+                cos( transform.PositionRotationVector.Y ),
+                sin( transform.PositionRotationVector.Y )
                 );
         }
 
         transformed_point.PositionVector.Translate(
-            position_translation_vector.X,
-            position_translation_vector.Y,
-            position_translation_vector.Z
+            transform.PositionTranslationVector.X,
+            transform.PositionTranslationVector.Y,
+            transform.PositionTranslationVector.Z
             );
 
         transformed_point.ColorVector.Translate(
-            color_offset_vector.X,
-            color_offset_vector.Y,
-            color_offset_vector.Z,
-            color_offset_vector.W
+            transform.ColorOffsetVector.X,
+            transform.ColorOffsetVector.Y,
+            transform.ColorOffsetVector.Z,
+            transform.ColorOffsetVector.W
             );
 
         transformed_point.ColorVector.Scale(
-            color_scaling_vector.X,
-            color_scaling_vector.Y,
-            color_scaling_vector.Z,
-            color_scaling_vector.W
+            transform.ColorScalingVector.X,
+            transform.ColorScalingVector.Y,
+            transform.ColorScalingVector.Z,
+            transform.ColorScalingVector.W
             );
 
         transformed_point.ColorVector.Translate(
-            color_translation_vector.X,
-            color_translation_vector.Y,
-            color_translation_vector.Z,
-            color_translation_vector.W
+            transform.ColorTranslationVector.X,
+            transform.ColorTranslationVector.Y,
+            transform.ColorTranslationVector.Z,
+            transform.ColorTranslationVector.W
             );
 
         return transformed_point;
     }
+};
+
+// ~~
+
+struct SCAN
+{
+    // -- ATTRIBUTES
+
+    vector<POINT>
+        PointVector;
+
+    // -- INQUIRIES
+
+    int64_t const GetPointCount(
+        ) const
+    {
+        return PointVector.size();
+    }
 
     // -- OPERATIONS
 
-    void SetNull(
+    void AddPoint(
+        const POINT & point
         )
     {
-        PositionVector.SetNull();
-        ColorVector.SetNull();
+        PointVector.push_back( point );
     }
 
     // ~~
 
-    void SetUnit(
+    void ReadE57File(
+        ImageFile & image_file,
+        CompressedVectorNode & compressed_vector_node,
+        const TRANSFORM & transform
         )
     {
-        PositionVector.SetUnit();
-        ColorVector.SetUnit();
+        const int64_t
+            MaximumPointCount = 4;
+        static float
+            point_x_array[ MaximumPointCount ],
+            point_y_array[ MaximumPointCount ],
+            point_z_array[ MaximumPointCount ];
+        int64_t
+            point_count,
+            point_index;
+        vector<SourceDestBuffer>
+            source_dest_buffer_vector;
+        StructureNode
+            prototype_structure_node( compressed_vector_node.prototype() );
+        POINT
+            point;
+
+        if ( prototype_structure_node.isDefined( "cartesianX" )
+             && prototype_structure_node.isDefined( "cartesianY" )
+             && prototype_structure_node.isDefined( "cartesianZ" ) )
+        {
+            source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianX", point_x_array, MaximumPointCount, true ) );
+            source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianY", point_y_array, MaximumPointCount, true ) );
+            source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianZ", point_z_array, MaximumPointCount, true ) );
+
+            CompressedVectorReader
+                compressed_vector_reader = compressed_vector_node.reader( source_dest_buffer_vector );
+
+            while ( ( point_count = compressed_vector_reader.read() ) > 0 )
+            {
+                for ( point_index = 0;
+                      point_index < point_count;
+                      ++point_index )
+                {
+                    point.PositionVector.X = point_x_array[ point_index ];
+                    point.PositionVector.Y = point_y_array[ point_index ];
+                    point.PositionVector.Z = point_z_array[ point_index ];
+
+                    AddPoint( point.GetTransformedPoint( transform ) );
+                }
+            }
+
+            compressed_vector_reader.close();
+        }
     }
 };
 
-// -- VARIABLES
+// ~~
 
-int
-    DecimationCount;
-string
-    InputFileFormat,
-    InputFilePath,
-    OutputFileFormat,
-    OutputFilePath,
-    OutputLineFormat;
-VECTOR_3
-    PositionOffsetVector,
-    PositionRotationVector,
-    PositionScalingVector,
-    PositionTranslationVector;
-VECTOR_4
-    ColorOffsetVector,
-    ColorScalingVector,
-    ColorTranslationVector;
+struct CLOUD
+{
+    // -- ATTRIBUTES
+
+    TRANSFORM
+        Transform;
+    vector<shared_ptr<SCAN>>
+        ScanVector;
+
+    // -- INQUIRIES
+
+    int64_t GetScanCount(
+        ) const
+    {
+        return ScanVector.size();
+    }
+
+    // ~~
+
+    void WriteXyzFile(
+        const string & file_path
+        )
+    {
+        ofstream
+            output_file_stream;
+
+        cout
+            << "Writing file : " << file_path << "\n";
+
+        output_file_stream.open( file_path );
+
+        for ( shared_ptr<SCAN> scan : ScanVector )
+        {
+            for ( POINT point : scan->PointVector )
+            {
+                output_file_stream
+                    << point.PositionVector.X
+                    << " "
+                    << point.PositionVector.Y
+                    << " "
+                    << point.PositionVector.Z
+                    << "\n";
+            }
+        }
+
+        output_file_stream.close();
+    }
+
+    // ~~
+
+    void WritePtsFile(
+        const string & file_path,
+        const string & line_format
+        )
+    {
+        int64_t
+            point_count;
+        ofstream
+            output_file_stream;
+
+        cout
+            << "Writing file : " << file_path << "\n";
+
+        output_file_stream.open( file_path );
+
+        point_count = 0;
+
+        for ( shared_ptr<SCAN> scan : ScanVector )
+        {
+            point_count += scan->GetPointCount();
+        }
+
+        output_file_stream
+            << point_count
+            << "\n";
+
+        for ( shared_ptr<SCAN> scan : ScanVector )
+        {
+            for ( POINT point : scan->PointVector )
+            {
+                output_file_stream
+                    << point.PositionVector.X
+                    << " "
+                    << point.PositionVector.Y
+                    << " "
+                    << point.PositionVector.Z
+                    << "\n";
+            }
+        }
+
+        output_file_stream.close();
+    }
+
+    // -- OPERATIONS
+
+    void ReadE57File(
+        const string & file_path
+        )
+    {
+        int64_t
+            scan_count,
+            scan_index;
+        shared_ptr<SCAN>
+            scan;
+
+        cout
+            << "Reading file : " << file_path << "\n";
+
+        ImageFile
+            image_file( file_path, "r" );
+        StructureNode
+            root_structure_node = image_file.root();
+
+        if ( root_structure_node.isDefined( "/data3D" ) )
+        {
+            VectorNode
+                vector_node( root_structure_node.get( "/data3D" ) );
+
+            scan_count = vector_node.childCount();
+
+            for ( scan_index = 0; scan_index < scan_count; scan_index++ )
+            {
+                StructureNode
+                    structure_node( vector_node.get( scan_index ) );
+                CompressedVectorNode
+                    compressed_vector_node( structure_node.get( "points" ) );
+
+                scan = make_shared<SCAN>();
+                scan->ReadE57File( image_file, compressed_vector_node, Transform );
+                ScanVector.push_back( scan );
+            }
+        }
+
+        image_file.close();
+    }
+};
 
 // -- FUNCTIONS
 
@@ -424,279 +621,156 @@ bool HasSuffix(
 
 // ~~
 
-void WriteXyzCloudFile(
-    ImageFile & image_file,
-    CompressedVectorNode & compressed_vector_node
-    )
-{
-    const int
-        MaximumPointCount = 4;
-    static double
-        point_x_array[ MaximumPointCount ],
-        point_y_array[ MaximumPointCount ],
-        point_z_array[ MaximumPointCount ];
-    int
-        point_count,
-        point_index;
-    ofstream
-        output_file_stream;
-    vector<SourceDestBuffer>
-        source_dest_buffer_vector;
-    StructureNode
-        prototype_structure_node( compressed_vector_node.prototype() );
-
-    cout
-        << "Writing file : " << OutputFilePath << "\n";
-
-    output_file_stream.open( OutputFilePath );
-
-    if ( prototype_structure_node.isDefined( "cartesianX" )
-         && prototype_structure_node.isDefined( "cartesianY" )
-         && prototype_structure_node.isDefined( "cartesianZ" ) )
-    {
-        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianX", point_x_array, MaximumPointCount, true ) );
-        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianY", point_y_array, MaximumPointCount, true ) );
-        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianZ", point_z_array, MaximumPointCount, true ) );
-
-        CompressedVectorReader
-            compressed_vector_reader = compressed_vector_node.reader( source_dest_buffer_vector );
-
-        while ( ( point_count = compressed_vector_reader.read() ) > 0 )
-        {
-            for ( point_index = 0;
-                  point_index < point_count;
-                  ++point_index )
-            {
-                output_file_stream
-                    << point_x_array[ point_index ]
-                    << " "
-                    << point_y_array[point_index]
-                    << " "
-                    << point_z_array[point_index]
-                    << "\n";
-            }
-        }
-
-        compressed_vector_reader.close();
-    }
-
-    output_file_stream.close();
-}
-
-// ~~
-
-void ReadE57CloudFile(
-    )
-{
-    int
-        scan_count,
-        scan_index;
-
-    cout
-        << "Reading file : " << InputFilePath << "\n";
-
-    ImageFile
-        image_file( InputFilePath, "r" );
-    StructureNode
-        root_structure_node = image_file.root();
-
-    if ( root_structure_node.isDefined( "/data3D" ) )
-    {
-        VectorNode
-            vector_node( root_structure_node.get( "/data3D" ) );
-
-        scan_count = vector_node.childCount();
-
-        for ( scan_index = 0; scan_index < scan_count; scan_index++ )
-        {
-            StructureNode
-                structure_node( vector_node.get( scan_index ) );
-            CompressedVectorNode
-                compressed_vector_node( structure_node.get( "points" ) );
-
-            if ( OutputFileFormat == "xyz" )
-            {
-                WriteXyzCloudFile( image_file, compressed_vector_node );
-            }
-        }
-    }
-
-    image_file.close();
-}
-
-// ~~
-
 int main(
     int argument_count,
     char** argument_array
     )
 {
-    PositionOffsetVector.SetNull();
-    PositionScalingVector.SetUnit();
-    PositionRotationVector.SetNull();
-    PositionTranslationVector.SetNull();
-    ColorOffsetVector.SetNull();
-    ColorScalingVector.SetUnit();
-    ColorTranslationVector.SetNull();
-    DecimationCount = 1;
-    InputFilePath = "";
-    InputFileFormat = "";
-    OutputFilePath = "";
-    OutputFileFormat = "";
-    OutputLineFormat = "";
+    CLOUD
+        cloud;
 
     --argument_count;
     ++argument_array;
 
-    while ( argument_count > 0
-            && argument_array[ 0 ][ 0 ] == '-'
-            && argument_array[ 0 ][ 1 ] == '-' )
+    try
     {
-        if ( argument_count >= 4
-             && !strcmp( argument_array[ 0 ], "--position-offset" ) )
+        while ( argument_count > 0
+                && argument_array[ 0 ][ 0 ] == '-'
+                && argument_array[ 0 ][ 1 ] == '-' )
         {
-            PositionOffsetVector.X = stod( argument_array[ 1 ] );
-            PositionOffsetVector.Y = stod( argument_array[ 2 ] );
-            PositionOffsetVector.Z = stod( argument_array[ 3 ] );
+            if ( argument_count >= 4
+                 && !strcmp( argument_array[ 0 ], "--position-offset" ) )
+            {
+                cloud.Transform.PositionOffsetVector.X = stof( argument_array[ 1 ] );
+                cloud.Transform.PositionOffsetVector.Y = stof( argument_array[ 2 ] );
+                cloud.Transform.PositionOffsetVector.Z = stof( argument_array[ 3 ] );
 
-            argument_count -= 4;
-            argument_array += 4;
-        }
-        else if ( argument_count >= 4
-                  && !strcmp( argument_array[ 0 ], "--position-scaling" ) )
-        {
-            PositionScalingVector.X = stod( argument_array[ 1 ] );
-            PositionScalingVector.Y = stod( argument_array[ 2 ] );
-            PositionScalingVector.Z = stod( argument_array[ 3 ] );
+                argument_count -= 4;
+                argument_array += 4;
+            }
+            else if ( argument_count >= 4
+                      && !strcmp( argument_array[ 0 ], "--position-scaling" ) )
+            {
+                cloud.Transform.PositionScalingVector.X = stof( argument_array[ 1 ] );
+                cloud.Transform.PositionScalingVector.Y = stof( argument_array[ 2 ] );
+                cloud.Transform.PositionScalingVector.Z = stof( argument_array[ 3 ] );
 
-            argument_count -= 4;
-            argument_array += 4;
-        }
-        else if ( argument_count >= 4
-                  && !strcmp( argument_array[ 0 ], "--position-rotation" ) )
-        {
-            PositionRotationVector.X = stod( argument_array[ 1 ] );
-            PositionRotationVector.Y = stod( argument_array[ 2 ] );
-            PositionRotationVector.Z = stod( argument_array[ 3 ] );
+                argument_count -= 4;
+                argument_array += 4;
+            }
+            else if ( argument_count >= 4
+                      && !strcmp( argument_array[ 0 ], "--position-rotation" ) )
+            {
+                cloud.Transform.PositionRotationVector.X = stof( argument_array[ 1 ] );
+                cloud.Transform.PositionRotationVector.Y = stof( argument_array[ 2 ] );
+                cloud.Transform.PositionRotationVector.Z = stof( argument_array[ 3 ] );
 
-            argument_count -= 4;
-            argument_array += 4;
-        }
-        else if ( argument_count >= 4
-                  && !strcmp( argument_array[ 0 ], "--position-translation" ) )
-        {
-            PositionTranslationVector.X = stod( argument_array[ 1 ] );
-            PositionTranslationVector.Y = stod( argument_array[ 2 ] );
-            PositionTranslationVector.Z = stod( argument_array[ 3 ] );
+                argument_count -= 4;
+                argument_array += 4;
+            }
+            else if ( argument_count >= 4
+                      && !strcmp( argument_array[ 0 ], "--position-translation" ) )
+            {
+                cloud.Transform.PositionTranslationVector.X = stof( argument_array[ 1 ] );
+                cloud.Transform.PositionTranslationVector.Y = stof( argument_array[ 2 ] );
+                cloud.Transform.PositionTranslationVector.Z = stof( argument_array[ 3 ] );
 
-            argument_count -= 4;
-            argument_array += 4;
-        }
-        else if ( argument_count >= 5
-                  && !strcmp( argument_array[ 0 ], "--color-offset" ) )
-        {
-            ColorOffsetVector.X = stod( argument_array[ 1 ] );
-            ColorOffsetVector.Y = stod( argument_array[ 2 ] );
-            ColorOffsetVector.Z = stod( argument_array[ 3 ] );
-            ColorOffsetVector.W = stod( argument_array[ 4 ] );
+                argument_count -= 4;
+                argument_array += 4;
+            }
+            else if ( argument_count >= 5
+                      && !strcmp( argument_array[ 0 ], "--color-offset" ) )
+            {
+                cloud.Transform.ColorOffsetVector.X = stof( argument_array[ 1 ] );
+                cloud.Transform.ColorOffsetVector.Y = stof( argument_array[ 2 ] );
+                cloud.Transform.ColorOffsetVector.Z = stof( argument_array[ 3 ] );
+                cloud.Transform.ColorOffsetVector.W = stof( argument_array[ 4 ] );
 
-            argument_count -= 5;
-            argument_array += 5;
-        }
-        else if ( argument_count >= 2
-                  && !strcmp( argument_array[ 0 ], "--color-scaling" ) )
-        {
-            ColorScalingVector.X = stod( argument_array[ 1 ] );
-            ColorScalingVector.Y = stod( argument_array[ 2 ] );
-            ColorScalingVector.Z = stod( argument_array[ 3 ] );
-            ColorScalingVector.W = stod( argument_array[ 4 ] );
+                argument_count -= 5;
+                argument_array += 5;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--color-scaling" ) )
+            {
+                cloud.Transform.ColorScalingVector.X = stof( argument_array[ 1 ] );
+                cloud.Transform.ColorScalingVector.Y = stof( argument_array[ 2 ] );
+                cloud.Transform.ColorScalingVector.Z = stof( argument_array[ 3 ] );
+                cloud.Transform.ColorScalingVector.W = stof( argument_array[ 4 ] );
 
-            argument_count -= 5;
-            argument_array += 5;
-        }
-        else if ( argument_count >= 2
-                  && !strcmp( argument_array[ 0 ], "--color-translation" ) )
-        {
-            ColorTranslationVector.X = stod( argument_array[ 1 ] );
-            ColorTranslationVector.Y = stod( argument_array[ 2 ] );
-            ColorTranslationVector.Z = stod( argument_array[ 3 ] );
-            ColorTranslationVector.W = stod( argument_array[ 4 ] );
+                argument_count -= 5;
+                argument_array += 5;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--color-translation" ) )
+            {
+                cloud.Transform.ColorTranslationVector.X = stof( argument_array[ 1 ] );
+                cloud.Transform.ColorTranslationVector.Y = stof( argument_array[ 2 ] );
+                cloud.Transform.ColorTranslationVector.Z = stof( argument_array[ 3 ] );
+                cloud.Transform.ColorTranslationVector.W = stof( argument_array[ 4 ] );
 
-            argument_count -= 5;
-            argument_array += 5;
-        }
-        else if ( argument_count >= 2
-                  && !strcmp( argument_array[ 0 ], "--decimation-count" ) )
-        {
-            DecimationCount = stoi( argument_array[ 1 ] );
+                argument_count -= 5;
+                argument_array += 5;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--decimation-count" ) )
+            {
+                cloud.Transform.DecimationCount = stoi( argument_array[ 1 ] );
 
-            argument_count -= 2;
-            argument_array += 2;
-        }
-        else if ( argument_count >= 2
-                  && !strcmp( argument_array[ 0 ], "--read-e57-cloud" ) )
-        {
-            InputFilePath = argument_array[ 1 ];
-            InputFileFormat = "e57";
+                argument_count -= 2;
+                argument_array += 2;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--read-e57-cloud" ) )
+            {
+                cloud.ReadE57File( argument_array[ 1 ] );
 
-            argument_count -= 2;
-            argument_array += 2;
-        }
-        else if ( argument_count >= 2
-                  && !strcmp( argument_array[ 0 ], "--write-xyz-cloud" )
-                  && OutputFileFormat == "" )
-        {
-            OutputFilePath = argument_array[ 1 ];
-            OutputFileFormat = "xyz";
+                argument_count -= 2;
+                argument_array += 2;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--write-xyz-cloud" ) )
+            {
+                cloud.WriteXyzFile( argument_array[ 1 ] );
 
-            argument_count -= 2;
-            argument_array += 2;
-        }
-        else if ( argument_count >= 3
-                  && !strcmp( argument_array[ 0 ], "--write-pts-cloud" )
-                  && OutputFileFormat == "" )
-        {
-            OutputFilePath = argument_array[ 1 ];
-            OutputFileFormat = "pts";
-            OutputLineFormat = argument_array[ 2 ];
+                argument_count -= 2;
+                argument_array += 2;
+            }
+            else if ( argument_count >= 3
+                      && !strcmp( argument_array[ 0 ], "--write-pts-cloud" ) )
+            {
+                cloud.WritePtsFile( argument_array[ 1 ], argument_array[ 2 ] );
 
-            argument_count -= 3;
-            argument_array += 3;
-        }
-        else
-        {
-            break;
+                argument_count -= 3;
+                argument_array += 3;
+            }
+            else
+            {
+                break;
+            }
         }
     }
-
-    if ( argument_count == 0
-         && InputFileFormat == "e57"
-         && OutputFileFormat != "" )
+    catch( E57Exception & exception_ )
     {
-        try
-        {
-            ReadE57CloudFile();
+        cerr
+            << "Error :\n";
 
-            return 0;
-        }
-        catch( E57Exception & exception_ )
-        {
-            cerr
-                << "Error :\n";
+        exception_.report( __FILE__, __LINE__, __FUNCTION__ );
+    }
+    catch ( std::exception & exception_ )
+    {
+        cerr
+            << "Error :\n"
+            << exception_.what() << "\n";
+    }
+    catch ( ... )
+    {
+        cerr
+            << "Error.\n";
+    }
 
-            exception_.report( __FILE__, __LINE__, __FUNCTION__ );
-        }
-        catch ( std::exception & exception_ )
-        {
-            cerr
-                << "Error :\n"
-                << exception_.what() << "\n";
-        }
-        catch ( ... )
-        {
-            cerr
-                << "Error.\n";
-        }
+    if ( argument_count == 0 )
+    {
+        return 0;
     }
     else
     {
@@ -715,7 +789,7 @@ int main(
             << "    --read-e57-cloud <file path>\n"
             << "    --write-xyz-cloud <file path>\n"
             << "    --write-pts-cloud <file path> <line format>\n";
-    }
 
-    return -1;
+        return -1;
+    }
 }
