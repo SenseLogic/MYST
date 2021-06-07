@@ -424,10 +424,14 @@ struct SCAN
     {
         const int64_t
             MaximumPointCount = 4;
-        static float
-            point_x_array[ MaximumPointCount ],
-            point_y_array[ MaximumPointCount ],
-            point_z_array[ MaximumPointCount ];
+        bool
+            point_has_x_field,
+            point_has_y_field,
+            point_has_z_field,
+            point_has_r_field,
+            point_has_g_field,
+            point_has_b_field,
+            point_has_i_field;
         int64_t
             point_count,
             point_index;
@@ -437,14 +441,50 @@ struct SCAN
             prototype_structure_node( compressed_vector_node.prototype() );
         POINT
             point;
+        static float
+            point_b_array[ MaximumPointCount ],
+            point_g_array[ MaximumPointCount ],
+            point_i_array[ MaximumPointCount ],
+            point_r_array[ MaximumPointCount ],
+            point_x_array[ MaximumPointCount ],
+            point_y_array[ MaximumPointCount ],
+            point_z_array[ MaximumPointCount ];
 
-        if ( prototype_structure_node.isDefined( "cartesianX" )
-             && prototype_structure_node.isDefined( "cartesianY" )
-             && prototype_structure_node.isDefined( "cartesianZ" ) )
+        point_has_x_field = prototype_structure_node.isDefined( "cartesianX" );
+        point_has_y_field = prototype_structure_node.isDefined( "cartesianY" );
+        point_has_z_field = prototype_structure_node.isDefined( "cartesianZ" );
+        point_has_r_field = prototype_structure_node.isDefined( "colorRed" );
+        point_has_g_field = prototype_structure_node.isDefined( "colorGreen" );
+        point_has_b_field = prototype_structure_node.isDefined( "colorBlue" );
+        point_has_i_field = prototype_structure_node.isDefined( "intensity" );
+
+        if ( point_has_x_field
+             && point_has_y_field
+             && point_has_z_field )
         {
             source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianX", point_x_array, MaximumPointCount, true ) );
             source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianY", point_y_array, MaximumPointCount, true ) );
             source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianZ", point_z_array, MaximumPointCount, true ) );
+
+            if ( point_has_r_field )
+            {
+                source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorRed", point_r_array, MaximumPointCount, true ) );
+            }
+
+            if ( point_has_g_field )
+            {
+                source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorGreen", point_g_array, MaximumPointCount, true ) );
+            }
+
+            if ( point_has_b_field )
+            {
+                source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorBlue", point_b_array, MaximumPointCount, true ) );
+            }
+
+            if ( point_has_i_field )
+            {
+                source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "intensity", point_i_array, MaximumPointCount, true ) );
+            }
 
             CompressedVectorReader
                 compressed_vector_reader = compressed_vector_node.reader( source_dest_buffer_vector );
@@ -458,6 +498,26 @@ struct SCAN
                     point.PositionVector.X = point_x_array[ point_index ];
                     point.PositionVector.Y = point_y_array[ point_index ];
                     point.PositionVector.Z = point_z_array[ point_index ];
+
+                    if ( point_has_r_field )
+                    {
+                        point.ColorVector.X = point_r_array[ point_index ];
+                    }
+
+                    if ( point_has_g_field )
+                    {
+                        point.ColorVector.Y = point_g_array[ point_index ];
+                    }
+
+                    if ( point_has_b_field )
+                    {
+                        point.ColorVector.Z = point_b_array[ point_index ];
+                    }
+
+                    if ( point_has_i_field )
+                    {
+                        point.ColorVector.W = point_i_array[ point_index ];
+                    }
 
                     AddPoint( point.GetTransformedPoint( transform ) );
                 }
@@ -525,7 +585,11 @@ struct CLOUD
         const string & line_format
         )
     {
+        char
+            field_character;
         int64_t
+            field_count,
+            field_index,
             point_count;
         ofstream
             output_file_stream;
@@ -535,6 +599,7 @@ struct CLOUD
 
         output_file_stream.open( file_path );
 
+        field_count = line_format.size();
         point_count = 0;
 
         for ( shared_ptr<SCAN> scan : ScanVector )
@@ -550,13 +615,60 @@ struct CLOUD
         {
             for ( POINT point : scan->PointVector )
             {
-                output_file_stream
-                    << point.PositionVector.X
-                    << " "
-                    << point.PositionVector.Y
-                    << " "
-                    << point.PositionVector.Z
-                    << "\n";
+                for ( field_index = 0;
+                      field_index < field_count;
+                      ++field_index )
+                {
+                    if ( field_index > 0 )
+                    {
+                        output_file_stream << " ";
+                    }
+
+                    field_character = line_format[ field_index ];
+
+                    if ( field_character == 'x' )
+                    {
+                        output_file_stream << ( -point.PositionVector.X );
+                    }
+                    else if ( field_character == 'y' )
+                    {
+                        output_file_stream << ( -point.PositionVector.Y );
+                    }
+                    else if ( field_character == 'z' )
+                    {
+                        output_file_stream << ( -point.PositionVector.Z );
+                    }
+                    else if ( field_character == 'X' )
+                    {
+                        output_file_stream << point.PositionVector.X;
+                    }
+                    else if ( field_character == 'Y' )
+                    {
+                        output_file_stream << point.PositionVector.Y;
+                    }
+                    else if ( field_character == 'Z' )
+                    {
+                        output_file_stream << point.PositionVector.Z;
+                    }
+                    else if ( field_character == 'R' )
+                    {
+                        output_file_stream << point.ColorVector.X;
+                    }
+                    else if ( field_character == 'G' )
+                    {
+                        output_file_stream << point.ColorVector.Y;
+                    }
+                    else if ( field_character == 'B' )
+                    {
+                        output_file_stream << point.ColorVector.Z;
+                    }
+                    else if ( field_character == 'I' )
+                    {
+                        output_file_stream << point.ColorVector.W;
+                    }
+                }
+
+                output_file_stream << "\n";
             }
         }
 
