@@ -22,7 +22,7 @@ nebula <options>
 --color-translation <r> <g> <b> <i> : set the loading color translation
 --decimation-count <decimation count> : set the loading decimation count
 --read-e57-cloud <file path> : read an E57 point cloud
---write-xyz-cloud <file path> : write an XYZ point cloud
+--write-xyz-cloud <file path> <line format> : write an XYZ point cloud
 --write-pts-cloud <file path> <line format> : write a PTS point cloud
 ```
 
@@ -41,9 +41,25 @@ B : blue
 I : intensity
 ```
 
+## Installation
+
+### Linux
+
+*   run `get.sh`
+*   run `make.sh`
+
+### Windows
+
+*   install [Visual C++ 2019](https://visualstudio.microsoft.com/fr/vs/community/)
+*   install [Cmake 3.21](https://github.com/Kitware/CMake/releases/download/v3.21.0-rc3/cmake-3.21.0-rc3-windows-x86_64.msi)
+*   install [Boost 1.76.0](https://sourceforge.net/projects/boost/files/boost-binaries/1.76.0/boost_1_76_0-msvc-14.2-64.exe/download) in `BOOST/boost_1_76_0`
+*   install [Xerces 3.2.3](https://downloads.apache.org//xerces/c/3/sources/xerces-c-3.2.3.zip) in `XERCES/xerces-c-3.2.3`
+*   run `XERCES/make.bat`
+*   run `make.bat`
+
 ## Version
 
-0.1
+0.2
 
 ## Author
 

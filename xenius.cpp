@@ -158,8 +158,7 @@ struct VECTOR_3
         )
     {
         float
-            x,
-            y;
+            x;
 
         x = X;
         X = X * z_angle_cosinus - Y * z_angle_sinus;
@@ -390,57 +389,24 @@ struct POINT
 
 // ~~
 
-struct SCAN
+struct CLOUD
 {
     // -- ATTRIBUTES
 
-    vector<POINT>
-        PointVector;
-
-    // -- INQUIRIES
-
-    int64_t const GetPointCount(
-        ) const
-    {
-        return PointVector.size();
-    }
+    TRANSFORM
+        Transform;
 
     // -- OPERATIONS
 
-    void AddPoint(
-        const POINT & point
-        )
-    {
-        PointVector.push_back( point );
-    }
-
-    // ~~
-
-    void ReadE57File(
-        ImageFile & image_file,
-        CompressedVectorNode & compressed_vector_node,
-        const TRANSFORM & transform
+    void ConvertFile(
+        const string & input_file_path,
+        const string & output_file_path,
+        const string & output_line_format,
+        const string & output_file_format
         )
     {
         const int64_t
             MaximumPointCount = 4;
-        bool
-            point_has_x_field,
-            point_has_y_field,
-            point_has_z_field,
-            point_has_r_field,
-            point_has_g_field,
-            point_has_b_field,
-            point_has_i_field;
-        int64_t
-            point_count,
-            point_index;
-        vector<SourceDestBuffer>
-            source_dest_buffer_vector;
-        StructureNode
-            prototype_structure_node( compressed_vector_node.prototype() );
-        POINT
-            point;
         static float
             point_b_array[ MaximumPointCount ],
             point_g_array[ MaximumPointCount ],
@@ -449,251 +415,54 @@ struct SCAN
             point_x_array[ MaximumPointCount ],
             point_y_array[ MaximumPointCount ],
             point_z_array[ MaximumPointCount ];
-
-        point_has_x_field = prototype_structure_node.isDefined( "cartesianX" );
-        point_has_y_field = prototype_structure_node.isDefined( "cartesianY" );
-        point_has_z_field = prototype_structure_node.isDefined( "cartesianZ" );
-        point_has_r_field = prototype_structure_node.isDefined( "colorRed" );
-        point_has_g_field = prototype_structure_node.isDefined( "colorGreen" );
-        point_has_b_field = prototype_structure_node.isDefined( "colorBlue" );
-        point_has_i_field = prototype_structure_node.isDefined( "intensity" );
-
-        if ( point_has_x_field
-             && point_has_y_field
-             && point_has_z_field )
-        {
-            source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianX", point_x_array, MaximumPointCount, true ) );
-            source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianY", point_y_array, MaximumPointCount, true ) );
-            source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianZ", point_z_array, MaximumPointCount, true ) );
-
-            if ( point_has_r_field )
-            {
-                source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorRed", point_r_array, MaximumPointCount, true ) );
-            }
-
-            if ( point_has_g_field )
-            {
-                source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorGreen", point_g_array, MaximumPointCount, true ) );
-            }
-
-            if ( point_has_b_field )
-            {
-                source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorBlue", point_b_array, MaximumPointCount, true ) );
-            }
-
-            if ( point_has_i_field )
-            {
-                source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "intensity", point_i_array, MaximumPointCount, true ) );
-            }
-
-            CompressedVectorReader
-                compressed_vector_reader = compressed_vector_node.reader( source_dest_buffer_vector );
-
-            while ( ( point_count = compressed_vector_reader.read() ) > 0 )
-            {
-                for ( point_index = 0;
-                      point_index < point_count;
-                      ++point_index )
-                {
-                    point.PositionVector.X = point_x_array[ point_index ];
-                    point.PositionVector.Y = point_y_array[ point_index ];
-                    point.PositionVector.Z = point_z_array[ point_index ];
-
-                    if ( point_has_r_field )
-                    {
-                        point.ColorVector.X = point_r_array[ point_index ];
-                    }
-
-                    if ( point_has_g_field )
-                    {
-                        point.ColorVector.Y = point_g_array[ point_index ];
-                    }
-
-                    if ( point_has_b_field )
-                    {
-                        point.ColorVector.Z = point_b_array[ point_index ];
-                    }
-
-                    if ( point_has_i_field )
-                    {
-                        point.ColorVector.W = point_i_array[ point_index ];
-                    }
-
-                    AddPoint( point.GetTransformedPoint( transform ) );
-                }
-            }
-
-            compressed_vector_reader.close();
-        }
-    }
-};
-
-// ~~
-
-struct CLOUD
-{
-    // -- ATTRIBUTES
-
-    TRANSFORM
-        Transform;
-    vector<shared_ptr<SCAN>>
-        ScanVector;
-
-    // -- INQUIRIES
-
-    int64_t GetScanCount(
-        ) const
-    {
-        return ScanVector.size();
-    }
-
-    // ~~
-
-    void WriteXyzFile(
-        const string & file_path
-        )
-    {
-        ofstream
-            output_file_stream;
-
-        cout
-            << "Writing file : " << file_path << "\n";
-
-        output_file_stream.open( file_path );
-
-        for ( shared_ptr<SCAN> scan : ScanVector )
-        {
-            for ( POINT point : scan->PointVector )
-            {
-                output_file_stream
-                    << point.PositionVector.X
-                    << " "
-                    << point.PositionVector.Y
-                    << " "
-                    << point.PositionVector.Z
-                    << "\n";
-            }
-        }
-
-        output_file_stream.close();
-    }
-
-    // ~~
-
-    void WritePtsFile(
-        const string & file_path,
-        const string & line_format
-        )
-    {
+        bool
+            point_has_x_field,
+            point_has_y_field,
+            point_has_z_field,
+            point_has_r_field,
+            point_has_g_field,
+            point_has_b_field,
+            point_has_i_field;
         char
             field_character;
         int64_t
+            output_point_count,
             field_count,
             field_index,
-            point_count;
-        ofstream
-            output_file_stream;
-
-        cout
-            << "Writing file : " << file_path << "\n";
-
-        output_file_stream.open( file_path );
-
-        field_count = line_format.size();
-        point_count = 0;
-
-        for ( shared_ptr<SCAN> scan : ScanVector )
-        {
-            point_count += scan->GetPointCount();
-        }
-
-        output_file_stream
-            << point_count
-            << "\n";
-
-        for ( shared_ptr<SCAN> scan : ScanVector )
-        {
-            for ( POINT point : scan->PointVector )
-            {
-                for ( field_index = 0;
-                      field_index < field_count;
-                      ++field_index )
-                {
-                    if ( field_index > 0 )
-                    {
-                        output_file_stream << " ";
-                    }
-
-                    field_character = line_format[ field_index ];
-
-                    if ( field_character == 'x' )
-                    {
-                        output_file_stream << ( -point.PositionVector.X );
-                    }
-                    else if ( field_character == 'y' )
-                    {
-                        output_file_stream << ( -point.PositionVector.Y );
-                    }
-                    else if ( field_character == 'z' )
-                    {
-                        output_file_stream << ( -point.PositionVector.Z );
-                    }
-                    else if ( field_character == 'X' )
-                    {
-                        output_file_stream << point.PositionVector.X;
-                    }
-                    else if ( field_character == 'Y' )
-                    {
-                        output_file_stream << point.PositionVector.Y;
-                    }
-                    else if ( field_character == 'Z' )
-                    {
-                        output_file_stream << point.PositionVector.Z;
-                    }
-                    else if ( field_character == 'R' )
-                    {
-                        output_file_stream << point.ColorVector.X;
-                    }
-                    else if ( field_character == 'G' )
-                    {
-                        output_file_stream << point.ColorVector.Y;
-                    }
-                    else if ( field_character == 'B' )
-                    {
-                        output_file_stream << point.ColorVector.Z;
-                    }
-                    else if ( field_character == 'I' )
-                    {
-                        output_file_stream << point.ColorVector.W;
-                    }
-                }
-
-                output_file_stream << "\n";
-            }
-        }
-
-        output_file_stream.close();
-    }
-
-    // -- OPERATIONS
-
-    void ReadE57File(
-        const string & file_path
-        )
-    {
-        int64_t
+            point_count,
+            point_index,
             scan_count,
             scan_index;
-        shared_ptr<SCAN>
-            scan;
+        ofstream
+            output_file_stream;
+        string
+            output_point_count_text;
+        vector<SourceDestBuffer>
+            source_dest_buffer_vector;
+        POINT
+            point;
+
+        field_count = output_file_format.size();
 
         cout
-            << "Reading file : " << file_path << "\n";
+            << "Reading file : " << input_file_path << "\n";
 
         ImageFile
-            image_file( file_path, "r" );
+            image_file( input_file_path, "r" );
         StructureNode
             root_structure_node = image_file.root();
+
+        cout
+            << "Writing file : " << output_file_path << "\n";
+
+        output_file_stream.open( output_file_path );
+
+        if ( output_file_format == "pts" )
+        {
+            output_file_stream << "00000000000000000000\n";
+        }
+
+        output_point_count = 0;
 
         if ( root_structure_node.isDefined( "/data3D" ) )
         {
@@ -708,13 +477,153 @@ struct CLOUD
                     structure_node( vector_node.get( scan_index ) );
                 CompressedVectorNode
                     compressed_vector_node( structure_node.get( "points" ) );
+                StructureNode
+                    prototype_structure_node( compressed_vector_node.prototype() );
 
-                scan = make_shared<SCAN>();
-                scan->ReadE57File( image_file, compressed_vector_node, Transform );
-                ScanVector.push_back( scan );
+                point_has_x_field = prototype_structure_node.isDefined( "cartesianX" );
+                point_has_y_field = prototype_structure_node.isDefined( "cartesianY" );
+                point_has_z_field = prototype_structure_node.isDefined( "cartesianZ" );
+                point_has_r_field = prototype_structure_node.isDefined( "colorRed" );
+                point_has_g_field = prototype_structure_node.isDefined( "colorGreen" );
+                point_has_b_field = prototype_structure_node.isDefined( "colorBlue" );
+                point_has_i_field = prototype_structure_node.isDefined( "intensity" );
+
+                if ( point_has_x_field
+                     && point_has_y_field
+                     && point_has_z_field )
+                {
+                    source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianX", point_x_array, MaximumPointCount, true ) );
+                    source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianY", point_y_array, MaximumPointCount, true ) );
+                    source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianZ", point_z_array, MaximumPointCount, true ) );
+
+                    if ( point_has_r_field )
+                    {
+                        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorRed", point_r_array, MaximumPointCount, true ) );
+                    }
+
+                    if ( point_has_g_field )
+                    {
+                        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorGreen", point_g_array, MaximumPointCount, true ) );
+                    }
+
+                    if ( point_has_b_field )
+                    {
+                        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorBlue", point_b_array, MaximumPointCount, true ) );
+                    }
+
+                    if ( point_has_i_field )
+                    {
+                        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "intensity", point_i_array, MaximumPointCount, true ) );
+                    }
+
+                    CompressedVectorReader
+                        compressed_vector_reader = compressed_vector_node.reader( source_dest_buffer_vector );
+
+                    while ( ( point_count = compressed_vector_reader.read() ) > 0 )
+                    {
+                        for ( point_index = 0;
+                              point_index < point_count;
+                              ++point_index )
+                        {
+                            point.PositionVector.X = point_x_array[ point_index ];
+                            point.PositionVector.Y = point_y_array[ point_index ];
+                            point.PositionVector.Z = point_z_array[ point_index ];
+
+                            if ( point_has_r_field )
+                            {
+                                point.ColorVector.X = point_r_array[ point_index ];
+                            }
+
+                            if ( point_has_g_field )
+                            {
+                                point.ColorVector.Y = point_g_array[ point_index ];
+                            }
+
+                            if ( point_has_b_field )
+                            {
+                                point.ColorVector.Z = point_b_array[ point_index ];
+                            }
+
+                            if ( point_has_i_field )
+                            {
+                                point.ColorVector.W = point_i_array[ point_index ];
+                            }
+
+                            point = point.GetTransformedPoint( Transform );
+
+                            for ( field_index = 0;
+                                  field_index < field_count;
+                                  ++field_index )
+                            {
+                                if ( field_index > 0 )
+                                {
+                                    output_file_stream << " ";
+                                }
+
+                                field_character = output_line_format[ field_index ];
+
+                                if ( field_character == 'x' )
+                                {
+                                    output_file_stream << ( -point.PositionVector.X );
+                                }
+                                else if ( field_character == 'y' )
+                                {
+                                    output_file_stream << ( -point.PositionVector.Y );
+                                }
+                                else if ( field_character == 'z' )
+                                {
+                                    output_file_stream << ( -point.PositionVector.Z );
+                                }
+                                else if ( field_character == 'X' )
+                                {
+                                    output_file_stream << point.PositionVector.X;
+                                }
+                                else if ( field_character == 'Y' )
+                                {
+                                    output_file_stream << point.PositionVector.Y;
+                                }
+                                else if ( field_character == 'Z' )
+                                {
+                                    output_file_stream << point.PositionVector.Z;
+                                }
+                                else if ( field_character == 'R' )
+                                {
+                                    output_file_stream << point.ColorVector.X;
+                                }
+                                else if ( field_character == 'G' )
+                                {
+                                    output_file_stream << point.ColorVector.Y;
+                                }
+                                else if ( field_character == 'B' )
+                                {
+                                    output_file_stream << point.ColorVector.Z;
+                                }
+                                else if ( field_character == 'I' )
+                                {
+                                    output_file_stream << point.ColorVector.W;
+                                }
+                            }
+
+                            output_file_stream << "\n";
+                        }
+
+                        output_point_count += point_count;
+                    }
+
+                    compressed_vector_reader.close();
+                }
+
             }
         }
 
+        if ( output_file_format == "pts" )
+        {
+            output_point_count_text = to_string( output_point_count );
+            output_file_stream.seekp( 20 - output_point_count_text.size() );
+            output_file_stream << output_point_count_text;
+        }
+
+        output_file_stream.close();
         image_file.close();
     }
 };
@@ -738,6 +647,8 @@ int main(
     char** argument_array
     )
 {
+    string
+        file_path;
     CLOUD
         cloud;
 
@@ -834,23 +745,23 @@ int main(
             else if ( argument_count >= 2
                       && !strcmp( argument_array[ 0 ], "--read-e57-cloud" ) )
             {
-                cloud.ReadE57File( argument_array[ 1 ] );
-
-                argument_count -= 2;
-                argument_array += 2;
-            }
-            else if ( argument_count >= 2
-                      && !strcmp( argument_array[ 0 ], "--write-xyz-cloud" ) )
-            {
-                cloud.WriteXyzFile( argument_array[ 1 ] );
+                file_path = argument_array[ 1 ];
 
                 argument_count -= 2;
                 argument_array += 2;
             }
             else if ( argument_count >= 3
+                      && !strcmp( argument_array[ 0 ], "--write-xyz-cloud" ) )
+            {
+                cloud.ConvertFile( file_path, argument_array[ 1 ], argument_array[ 2 ], "xyz" );
+
+                argument_count -= 3;
+                argument_array += 3;
+            }
+            else if ( argument_count >= 3
                       && !strcmp( argument_array[ 0 ], "--write-pts-cloud" ) )
             {
-                cloud.WritePtsFile( argument_array[ 1 ], argument_array[ 2 ] );
+                cloud.ConvertFile( file_path, argument_array[ 1 ], argument_array[ 2 ], "pts" );
 
                 argument_count -= 3;
                 argument_array += 3;
