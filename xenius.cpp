@@ -24,7 +24,21 @@
 #include <string.h>
 #include <iostream>
 #include <fstream>
+
+typedef struct _SYSTEMTIME
+{
+  uint16_t wYear;
+  uint16_t wMonth;
+  uint16_t wDayOfWeek;
+  uint16_t wDay;
+  uint16_t wHour;
+  uint16_t wMinute;
+  uint16_t wSecond;
+  uint16_t wMilliseconds;
+} SYSTEMTIME;
+
 #include "E57Foundation.h"
+#include "E57Simple.h"
 
 using namespace e57;
 using namespace std;
@@ -35,7 +49,7 @@ struct VECTOR_3
 {
     // -- ATTRIBUTES
 
-    float
+    double
         X,
         Y,
         Z;
@@ -75,7 +89,7 @@ struct VECTOR_3
 
     void AddScaledVector(
         const VECTOR_3 & vector,
-        float factor
+        double factor
         )
     {
         X += vector.X * factor;
@@ -86,7 +100,7 @@ struct VECTOR_3
     // ~~
 
     void MultiplyScalar(
-        float scalar
+        double scalar
         )
     {
         X *= scalar;
@@ -97,9 +111,9 @@ struct VECTOR_3
     // ~~
 
     void Translate(
-        float x_translation,
-        float y_translation,
-        float z_translation
+        double x_translation,
+        double y_translation,
+        double z_translation
         )
     {
         X += x_translation;
@@ -110,9 +124,9 @@ struct VECTOR_3
     // ~~
 
     void Scale(
-        float x_scaling,
-        float y_scaling,
-        float z_scaling
+        double x_scaling,
+        double y_scaling,
+        double z_scaling
         )
     {
         X *= x_scaling;
@@ -123,11 +137,11 @@ struct VECTOR_3
     // ~~
 
     void RotateAroundX(
-        float x_angle_cosinus,
-        float x_angle_sinus
+        double x_angle_cosinus,
+        double x_angle_sinus
         )
     {
-        float
+        double
             y;
 
         y = Y;
@@ -138,11 +152,11 @@ struct VECTOR_3
     // ~~
 
     void RotateAroundY(
-        float y_angle_cosinus,
-        float y_angle_sinus
+        double y_angle_cosinus,
+        double y_angle_sinus
         )
     {
-        float
+        double
             x;
 
         x = X;
@@ -153,11 +167,11 @@ struct VECTOR_3
     // ~~
 
     void RotateAroundZ(
-        float z_angle_cosinus,
-        float z_angle_sinus
+        double z_angle_cosinus,
+        double z_angle_sinus
         )
     {
-        float
+        double
             x;
 
         x = X;
@@ -172,7 +186,7 @@ struct VECTOR_4
 {
     // -- ATTRIBUTES
 
-    float
+    double
         X,
         Y,
         Z,
@@ -215,7 +229,7 @@ struct VECTOR_4
     // ~~
 
     void MultiplyScalar(
-        float scalar
+        double scalar
         )
     {
         X *= scalar;
@@ -227,10 +241,10 @@ struct VECTOR_4
     // ~~
 
     void Translate(
-        float x_translation,
-        float y_translation,
-        float z_translation,
-        float w_translation
+        double x_translation,
+        double y_translation,
+        double z_translation,
+        double w_translation
         )
     {
         X += x_translation;
@@ -242,10 +256,10 @@ struct VECTOR_4
     // ~~
 
     void Scale(
-        float x_scaling,
-        float y_scaling,
-        float z_scaling,
-        float w_scaling
+        double x_scaling,
+        double y_scaling,
+        double z_scaling,
+        double w_scaling
         )
     {
         X *= x_scaling;
@@ -389,12 +403,36 @@ struct POINT
 
 // ~~
 
+struct SCAN
+{
+    // -- ATTRIBUTES
+
+    VECTOR_3
+        PositionVector;
+    VECTOR_4
+        RotationVector;
+    Data3D
+        Data;
+    int64_t
+        RowCount,
+        ColumnCount,
+        PointCount,
+        GroupCount,
+        MaximumPointCount;
+    bool
+        IsColumnIndex;
+};
+
+// ~~
+
 struct CLOUD
 {
     // -- ATTRIBUTES
 
     TRANSFORM
         Transform;
+    vector<SCAN>
+        ScanVector;
 
     // -- OPERATIONS
 
@@ -406,15 +444,16 @@ struct CLOUD
         )
     {
         const int64_t
-            MaximumPointCount = 4;
-        static float
-            point_b_array[ MaximumPointCount ],
-            point_g_array[ MaximumPointCount ],
+            MaximumPointCount = 65536;
+        static double
             point_i_array[ MaximumPointCount ],
-            point_r_array[ MaximumPointCount ],
             point_x_array[ MaximumPointCount ],
             point_y_array[ MaximumPointCount ],
             point_z_array[ MaximumPointCount ];
+        static uint16_t
+            point_b_array[ MaximumPointCount ],
+            point_g_array[ MaximumPointCount ],
+            point_r_array[ MaximumPointCount ];
         bool
             point_has_x_field,
             point_has_y_field,
@@ -425,32 +464,76 @@ struct CLOUD
             point_has_i_field;
         char
             field_character;
+        double
+            minimum_b,
+            maximum_b,
+            minimum_g,
+            maximum_g,
+            minimum_i,
+            maximum_i,
+            minimum_r,
+            maximum_r,
+            minimum_x,
+            maximum_x,
+            minimum_y,
+            maximum_y,
+            minimum_z,
+            maximum_z;
+        int32_t
+            scan_count,
+            scan_index;
         int64_t
-            output_point_count,
             field_count,
             field_index,
             point_count,
-            point_index,
-            scan_count,
-            scan_index;
+            point_index;
         ofstream
             output_file_stream;
         string
             output_point_count_text;
-        vector<SourceDestBuffer>
-            source_dest_buffer_vector;
         POINT
             point;
-
-        field_count = output_file_format.size();
+        SCAN
+            * scan;
 
         cout
             << "Reading file : " << input_file_path << "\n";
 
-        ImageFile
-            image_file( input_file_path, "r" );
-        StructureNode
-            root_structure_node = image_file.root();
+        Reader
+            file_reader( input_file_path );
+
+        scan_count = file_reader.GetData3DCount();
+        ScanVector.resize( scan_count );
+
+        point_count = 0;
+
+        for ( scan_index = 0;
+              scan_index < scan_count;
+              ++scan_index )
+        {
+            scan = &ScanVector[ scan_index ];
+            file_reader.ReadData3D( scan_index, scan->Data );
+
+            scan->PositionVector.X = scan->Data.pose.translation.x;
+            scan->PositionVector.Y = scan->Data.pose.translation.y;
+            scan->PositionVector.Z = scan->Data.pose.translation.z;
+            scan->RotationVector.X = scan->Data.pose.rotation.x;
+            scan->RotationVector.Y = scan->Data.pose.rotation.y;
+            scan->RotationVector.Z = scan->Data.pose.rotation.z;
+            scan->RotationVector.W = scan->Data.pose.rotation.w;
+
+            file_reader.GetData3DSizes(
+                scan_index,
+                scan->RowCount,
+                scan->ColumnCount,
+                scan->PointCount,
+                scan->GroupCount,
+                scan->MaximumPointCount,
+                scan->IsColumnIndex
+                );
+
+            point_count += scan->PointCount;
+        }
 
         cout
             << "Writing file : " << output_file_path << "\n";
@@ -459,172 +542,162 @@ struct CLOUD
 
         if ( output_file_format == "pts" )
         {
-            output_file_stream << "00000000000000000000\n";
+            output_file_stream << point_count << "\n";
         }
 
-        output_point_count = 0;
+        field_count = output_line_format.size();
 
-        if ( root_structure_node.isDefined( "/data3D" ) )
+        for ( scan_index = 0;
+              scan_index < scan_count;
+              ++scan_index )
         {
-            VectorNode
-                vector_node( root_structure_node.get( "/data3D" ) );
+            scan = &ScanVector[ scan_index ];
 
-            scan_count = vector_node.childCount();
+            point_has_x_field = scan->Data.pointFields.cartesianXField;
+            point_has_y_field = scan->Data.pointFields.cartesianYField;
+            point_has_z_field = scan->Data.pointFields.cartesianZField;
+            point_has_r_field = scan->Data.pointFields.colorRedField;
+            point_has_g_field = scan->Data.pointFields.colorGreenField;
+            point_has_b_field = scan->Data.pointFields.colorBlueField;
+            point_has_i_field = scan->Data.pointFields.intensityField;
 
-            for ( scan_index = 0; scan_index < scan_count; scan_index++ )
+            minimum_x = scan->Data.cartesianBounds.xMinimum;
+            maximum_x = scan->Data.cartesianBounds.xMaximum;
+            minimum_y = scan->Data.cartesianBounds.yMinimum;
+            maximum_y = scan->Data.cartesianBounds.yMaximum;
+            minimum_z = scan->Data.cartesianBounds.zMinimum;
+            maximum_z = scan->Data.cartesianBounds.zMaximum;
+            minimum_r = scan->Data.colorLimits.colorRedMinimum;
+            maximum_r = scan->Data.colorLimits.colorRedMaximum;
+            minimum_g = scan->Data.colorLimits.colorGreenMinimum;
+            maximum_g = scan->Data.colorLimits.colorGreenMaximum;
+            minimum_b = scan->Data.colorLimits.colorBlueMinimum;
+            maximum_b = scan->Data.colorLimits.colorBlueMaximum;
+            minimum_i = scan->Data.intensityLimits.intensityMinimum;
+            maximum_i = scan->Data.intensityLimits.intensityMaximum;
+
+            if ( point_has_x_field
+                 && point_has_y_field
+                 && point_has_z_field )
             {
-                StructureNode
-                    structure_node( vector_node.get( scan_index ) );
-                CompressedVectorNode
-                    compressed_vector_node( structure_node.get( "points" ) );
-                StructureNode
-                    prototype_structure_node( compressed_vector_node.prototype() );
+                CompressedVectorReader
+                    compressed_vector_reader
+                        = file_reader.SetUpData3DPointsData(
+                            scan_index,
+                            MaximumPointCount,
+                            point_x_array,
+                            point_y_array,
+                            point_z_array,
+                            nullptr,
+                            point_i_array,
+                            nullptr,
+                            point_r_array,
+                            point_g_array,
+                            point_b_array,
+                            nullptr,
+                            nullptr,
+                            nullptr,
+                            nullptr,
+                            nullptr,
+                            nullptr
+                            );
 
-                point_has_x_field = prototype_structure_node.isDefined( "cartesianX" );
-                point_has_y_field = prototype_structure_node.isDefined( "cartesianY" );
-                point_has_z_field = prototype_structure_node.isDefined( "cartesianZ" );
-                point_has_r_field = prototype_structure_node.isDefined( "colorRed" );
-                point_has_g_field = prototype_structure_node.isDefined( "colorGreen" );
-                point_has_b_field = prototype_structure_node.isDefined( "colorBlue" );
-                point_has_i_field = prototype_structure_node.isDefined( "intensity" );
-
-                if ( point_has_x_field
-                     && point_has_y_field
-                     && point_has_z_field )
+                while ( ( point_count = compressed_vector_reader.read() ) > 0 )
                 {
-                    source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianX", point_x_array, MaximumPointCount, true ) );
-                    source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianY", point_y_array, MaximumPointCount, true ) );
-                    source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "cartesianZ", point_z_array, MaximumPointCount, true ) );
-
-                    if ( point_has_r_field )
+                    for ( point_index = 0;
+                          point_index < point_count;
+                          ++point_index )
                     {
-                        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorRed", point_r_array, MaximumPointCount, true ) );
-                    }
+                        point.PositionVector.X = point_x_array[ point_index ];
+                        point.PositionVector.Y = point_y_array[ point_index ];
+                        point.PositionVector.Z = point_z_array[ point_index ];
 
-                    if ( point_has_g_field )
-                    {
-                        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorGreen", point_g_array, MaximumPointCount, true ) );
-                    }
-
-                    if ( point_has_b_field )
-                    {
-                        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "colorBlue", point_b_array, MaximumPointCount, true ) );
-                    }
-
-                    if ( point_has_i_field )
-                    {
-                        source_dest_buffer_vector.push_back( SourceDestBuffer( image_file, "intensity", point_i_array, MaximumPointCount, true ) );
-                    }
-
-                    CompressedVectorReader
-                        compressed_vector_reader = compressed_vector_node.reader( source_dest_buffer_vector );
-
-                    while ( ( point_count = compressed_vector_reader.read() ) > 0 )
-                    {
-                        for ( point_index = 0;
-                              point_index < point_count;
-                              ++point_index )
+                        if ( point_has_r_field )
                         {
-                            point.PositionVector.X = point_x_array[ point_index ];
-                            point.PositionVector.Y = point_y_array[ point_index ];
-                            point.PositionVector.Z = point_z_array[ point_index ];
-
-                            if ( point_has_r_field )
-                            {
-                                point.ColorVector.X = point_r_array[ point_index ];
-                            }
-
-                            if ( point_has_g_field )
-                            {
-                                point.ColorVector.Y = point_g_array[ point_index ];
-                            }
-
-                            if ( point_has_b_field )
-                            {
-                                point.ColorVector.Z = point_b_array[ point_index ];
-                            }
-
-                            if ( point_has_i_field )
-                            {
-                                point.ColorVector.W = point_i_array[ point_index ];
-                            }
-
-                            point = point.GetTransformedPoint( Transform );
-
-                            for ( field_index = 0;
-                                  field_index < field_count;
-                                  ++field_index )
-                            {
-                                if ( field_index > 0 )
-                                {
-                                    output_file_stream << " ";
-                                }
-
-                                field_character = output_line_format[ field_index ];
-
-                                if ( field_character == 'x' )
-                                {
-                                    output_file_stream << ( -point.PositionVector.X );
-                                }
-                                else if ( field_character == 'y' )
-                                {
-                                    output_file_stream << ( -point.PositionVector.Y );
-                                }
-                                else if ( field_character == 'z' )
-                                {
-                                    output_file_stream << ( -point.PositionVector.Z );
-                                }
-                                else if ( field_character == 'X' )
-                                {
-                                    output_file_stream << point.PositionVector.X;
-                                }
-                                else if ( field_character == 'Y' )
-                                {
-                                    output_file_stream << point.PositionVector.Y;
-                                }
-                                else if ( field_character == 'Z' )
-                                {
-                                    output_file_stream << point.PositionVector.Z;
-                                }
-                                else if ( field_character == 'R' )
-                                {
-                                    output_file_stream << point.ColorVector.X;
-                                }
-                                else if ( field_character == 'G' )
-                                {
-                                    output_file_stream << point.ColorVector.Y;
-                                }
-                                else if ( field_character == 'B' )
-                                {
-                                    output_file_stream << point.ColorVector.Z;
-                                }
-                                else if ( field_character == 'I' )
-                                {
-                                    output_file_stream << point.ColorVector.W;
-                                }
-                            }
-
-                            output_file_stream << "\n";
+                            point.ColorVector.X
+                                = floor( ( point_r_array[ point_index ] - minimum_r ) * 255 / ( maximum_r - minimum_r ) );
                         }
 
-                        output_point_count += point_count;
+                        if ( point_has_g_field )
+                        {
+                            point.ColorVector.Y
+                                = floor( ( point_g_array[ point_index ] - minimum_g ) * 255 / ( maximum_g - minimum_g ) );
+                        }
+
+                        if ( point_has_b_field )
+                        {
+                            point.ColorVector.Z
+                                = floor( ( point_b_array[ point_index ] - minimum_b ) * 255 / ( maximum_b - minimum_b ) );
+                        }
+
+                        if ( point_has_i_field )
+                        {
+                            point.ColorVector.W
+                                = floor( ( point_i_array[ point_index ] - minimum_i ) * 255 / ( maximum_i - minimum_i ) );
+                        }
+
+                        point = point.GetTransformedPoint( Transform );
+
+                        for ( field_index = 0;
+                              field_index < field_count;
+                              ++field_index )
+                        {
+                            if ( field_index > 0 )
+                            {
+                                output_file_stream << " ";
+                            }
+
+                            field_character = output_line_format[ field_index ];
+
+                            if ( field_character == 'x' )
+                            {
+                                output_file_stream << ( -point.PositionVector.X );
+                            }
+                            else if ( field_character == 'y' )
+                            {
+                                output_file_stream << ( -point.PositionVector.Y );
+                            }
+                            else if ( field_character == 'z' )
+                            {
+                                output_file_stream << ( -point.PositionVector.Z );
+                            }
+                            else if ( field_character == 'X' )
+                            {
+                                output_file_stream << point.PositionVector.X;
+                            }
+                            else if ( field_character == 'Y' )
+                            {
+                                output_file_stream << point.PositionVector.Y;
+                            }
+                            else if ( field_character == 'Z' )
+                            {
+                                output_file_stream << point.PositionVector.Z;
+                            }
+                            else if ( field_character == 'R' )
+                            {
+                                output_file_stream << point.ColorVector.X;
+                            }
+                            else if ( field_character == 'G' )
+                            {
+                                output_file_stream << point.ColorVector.Y;
+                            }
+                            else if ( field_character == 'B' )
+                            {
+                                output_file_stream << point.ColorVector.Z;
+                            }
+                            else if ( field_character == 'I' )
+                            {
+                                output_file_stream << point.ColorVector.W;
+                            }
+                        }
+
+                        output_file_stream << "\n";
                     }
-
-                    compressed_vector_reader.close();
                 }
-
             }
         }
 
-        if ( output_file_format == "pts" )
-        {
-            output_point_count_text = to_string( output_point_count );
-            output_file_stream.seekp( 20 - output_point_count_text.size() );
-            output_file_stream << output_point_count_text;
-        }
-
         output_file_stream.close();
-        image_file.close();
     }
 };
 

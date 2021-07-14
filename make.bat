@@ -6,4 +6,5 @@ cd BUILD
 "C:\Program Files\CMake\bin\cmake" --build .
 copy Debug\xenius.exe ..\xenius.exe
 copy ..\XERCES\xerces-c-3.2.3\BUILD\src\Debug\xerces-c_3_2D.dll ..\xerces-c_3_2D.dll
+cd ..
 pause

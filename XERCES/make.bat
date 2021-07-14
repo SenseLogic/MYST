@@ -5,4 +5,5 @@ mkdir BUILD
 cd BUILD
 "C:\Program Files\CMake\bin\cmake" ..
 "C:\Program Files\CMake\bin\cmake" --build .
+cd ..
 pause
