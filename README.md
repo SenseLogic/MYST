@@ -52,7 +52,7 @@ I : intensity
 
 *   install [Visual C++ 2019](https://visualstudio.microsoft.com/fr/vs/community/)
 *   install [Cmake 3.21](https://github.com/Kitware/CMake/releases/download/v3.21.0-rc3/cmake-3.21.0-rc3-windows-x86_64.msi)
-*   install [Boost 1.76.0](https://sourceforge.net/projects/boost/files/boost-binaries/1.76.0/boost_1_76_0-msvc-14.2-64.exe/download) in `BOOST/boost_1_76_0`
+*   install [Boost 1.76.0](https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.7z) in `BOOST/boost_1_76_0`
 *   install [Xerces 3.2.3](https://downloads.apache.org//xerces/c/3/sources/xerces-c-3.2.3.zip) in `XERCES/xerces-c-3.2.3`
 *   run `XERCES/make.bat`
 *   run `make.bat`
