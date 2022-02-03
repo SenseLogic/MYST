@@ -24,6 +24,7 @@ nebula <options>
 --read-e57-cloud <file path> : read an E57 point cloud
 --write-xyz-cloud <file path> <line format> : write an XYZ point cloud
 --write-pts-cloud <file path> <line format> : write a PTS point cloud
+--write-pcf-cloud <file path> <position bit count> <position precision> : write a PCF point cloud
 ```
 
 ### Output line format

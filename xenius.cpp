@@ -40,236 +40,26 @@ typedef struct _SYSTEMTIME
 #include "E57Foundation.h"
 #include "E57Simple.h"
 
-using namespace e57;
+#include "cell.hpp"
+#include "cloud.hpp"
+#include "compression.hpp"
+#include "link_.hpp"
+#include "scan.hpp"
+#include "vector_3.hpp"
+#include "vector_4.hpp"
+
 using namespace std;
+using namespace e57;
+using pcf::CELL;
+using pcf::CLOUD;
+using pcf::COMPONENT;
+using pcf::COMPRESSION;
+using pcf::LINK_;
+using pcf::SCAN;
+using pcf::VECTOR_3;
+using pcf::VECTOR_4;
 
 // -- TYPES
-
-struct VECTOR_3
-{
-    // -- ATTRIBUTES
-
-    double
-        X,
-        Y,
-        Z;
-
-    // -- OPERATIONS
-
-    void SetNull(
-        )
-    {
-        X = 0.0;
-        Y = 0.0;
-        Z = 0.0;
-    }
-
-    // ~~
-
-    void SetUnit(
-        )
-    {
-        X = 1.0;
-        Y = 1.0;
-        Z = 1.0;
-    }
-
-    // ~~
-
-    void AddVector(
-        const VECTOR_3 & vector
-        )
-    {
-        X += vector.X;
-        Y += vector.Y;
-        Z += vector.Z;
-    }
-
-    // ~~
-
-    void AddScaledVector(
-        const VECTOR_3 & vector,
-        double factor
-        )
-    {
-        X += vector.X * factor;
-        Y += vector.Y * factor;
-        Z += vector.Z * factor;
-    }
-
-    // ~~
-
-    void MultiplyScalar(
-        double scalar
-        )
-    {
-        X *= scalar;
-        Y *= scalar;
-        Z *= scalar;
-    }
-
-    // ~~
-
-    void Translate(
-        double x_translation,
-        double y_translation,
-        double z_translation
-        )
-    {
-        X += x_translation;
-        Y += y_translation;
-        Z += z_translation;
-    }
-
-    // ~~
-
-    void Scale(
-        double x_scaling,
-        double y_scaling,
-        double z_scaling
-        )
-    {
-        X *= x_scaling;
-        Y *= y_scaling;
-        Z *= z_scaling;
-    }
-
-    // ~~
-
-    void RotateAroundX(
-        double x_angle_cosinus,
-        double x_angle_sinus
-        )
-    {
-        double
-            y;
-
-        y = Y;
-        Y = Y * x_angle_cosinus - Z * x_angle_sinus;
-        Z = y * x_angle_sinus + Z * x_angle_cosinus;
-    }
-
-    // ~~
-
-    void RotateAroundY(
-        double y_angle_cosinus,
-        double y_angle_sinus
-        )
-    {
-        double
-            x;
-
-        x = X;
-        X = X * y_angle_cosinus + Z * y_angle_sinus;
-        Z = Z * y_angle_cosinus - x * y_angle_sinus;
-    }
-
-    // ~~
-
-    void RotateAroundZ(
-        double z_angle_cosinus,
-        double z_angle_sinus
-        )
-    {
-        double
-            x;
-
-        x = X;
-        X = X * z_angle_cosinus - Y * z_angle_sinus;
-        Y = x * z_angle_sinus + Y * z_angle_cosinus;
-    }
-};
-
-// ~~
-
-struct VECTOR_4
-{
-    // -- ATTRIBUTES
-
-    double
-        X,
-        Y,
-        Z,
-        W;
-
-    // -- OPERATIONS
-
-    void SetNull(
-        )
-    {
-        X = 0.0;
-        Y = 0.0;
-        Z = 0.0;
-        W = 0.0;
-    }
-
-    // ~~
-
-    void SetUnit(
-        )
-    {
-        X = 1.0;
-        Y = 1.0;
-        Z = 1.0;
-        W = 1.0;
-    }
-
-    // ~~
-
-    void AddVector(
-        const VECTOR_4 & vector
-        )
-    {
-        X += vector.X;
-        Y += vector.Y;
-        Z += vector.Z;
-        W += vector.W;
-    }
-
-    // ~~
-
-    void MultiplyScalar(
-        double scalar
-        )
-    {
-        X *= scalar;
-        Y *= scalar;
-        Z *= scalar;
-        W *= scalar;
-    }
-
-    // ~~
-
-    void Translate(
-        double x_translation,
-        double y_translation,
-        double z_translation,
-        double w_translation
-        )
-    {
-        X += x_translation;
-        Y += y_translation;
-        Z += z_translation;
-        W += w_translation;
-    }
-
-    // ~~
-
-    void Scale(
-        double x_scaling,
-        double y_scaling,
-        double z_scaling,
-        double w_scaling
-        )
-    {
-        X *= x_scaling;
-        Y *= y_scaling;
-        Z *= z_scaling;
-        W *= w_scaling;
-    }
-};
-
-// ~~
 
 struct TRANSFORM
 {
@@ -403,7 +193,7 @@ struct POINT
 
 // ~~
 
-struct SCAN
+struct E57_SCAN
 {
     // -- ATTRIBUTES
 
@@ -425,18 +215,18 @@ struct SCAN
 
 // ~~
 
-struct CLOUD
+struct E57_CLOUD
 {
     // -- ATTRIBUTES
 
     TRANSFORM
         Transform;
-    vector<SCAN>
+    vector<E57_SCAN>
         ScanVector;
 
     // -- OPERATIONS
 
-    void ConvertFile(
+    void WriteXyzOrPtsFile(
         const string & input_file_path,
         const string & output_file_path,
         const string & output_line_format,
@@ -455,13 +245,14 @@ struct CLOUD
             point_g_array[ MaximumPointCount ],
             point_r_array[ MaximumPointCount ];
         bool
-            point_has_x_field,
-            point_has_y_field,
-            point_has_z_field,
-            point_has_r_field,
-            point_has_g_field,
             point_has_b_field,
-            point_has_i_field;
+            point_has_g_field,
+            point_has_i_field,
+            point_has_r_field,
+            point_has_x_field,
+            point_has_xyz_fields,
+            point_has_y_field,
+            point_has_z_field;
         char
             field_character;
         double
@@ -489,11 +280,9 @@ struct CLOUD
             point_index;
         ofstream
             output_file_stream;
-        string
-            output_point_count_text;
         POINT
             point;
-        SCAN
+        E57_SCAN
             * scan;
 
         cout
@@ -561,6 +350,8 @@ struct CLOUD
             point_has_b_field = scan->Data.pointFields.colorBlueField;
             point_has_i_field = scan->Data.pointFields.intensityField;
 
+            point_has_xyz_fields = point_has_x_field && point_has_y_field && point_has_z_field;
+
             minimum_x = scan->Data.cartesianBounds.xMinimum;
             maximum_x = scan->Data.cartesianBounds.xMaximum;
             minimum_y = scan->Data.cartesianBounds.yMinimum;
@@ -576,9 +367,7 @@ struct CLOUD
             minimum_i = scan->Data.intensityLimits.intensityMinimum;
             maximum_i = scan->Data.intensityLimits.intensityMaximum;
 
-            if ( point_has_x_field
-                 && point_has_y_field
-                 && point_has_z_field )
+            if ( point_has_xyz_fields )
             {
                 CompressedVectorReader
                     compressed_vector_reader
@@ -614,26 +403,22 @@ struct CLOUD
 
                         if ( point_has_r_field )
                         {
-                            point.ColorVector.X
-                                = floor( ( point_r_array[ point_index ] - minimum_r ) * 255 / ( maximum_r - minimum_r ) );
+                            point.ColorVector.X = floor( ( point_r_array[ point_index ] - minimum_r ) * 255 / ( maximum_r - minimum_r ) );
                         }
 
                         if ( point_has_g_field )
                         {
-                            point.ColorVector.Y
-                                = floor( ( point_g_array[ point_index ] - minimum_g ) * 255 / ( maximum_g - minimum_g ) );
+                            point.ColorVector.Y = floor( ( point_g_array[ point_index ] - minimum_g ) * 255 / ( maximum_g - minimum_g ) );
                         }
 
                         if ( point_has_b_field )
                         {
-                            point.ColorVector.Z
-                                = floor( ( point_b_array[ point_index ] - minimum_b ) * 255 / ( maximum_b - minimum_b ) );
+                            point.ColorVector.Z = floor( ( point_b_array[ point_index ] - minimum_b ) * 255 / ( maximum_b - minimum_b ) );
                         }
 
                         if ( point_has_i_field )
                         {
-                            point.ColorVector.W
-                                = floor( ( point_i_array[ point_index ] - minimum_i ) * 255 / ( maximum_i - minimum_i ) );
+                            point.ColorVector.W = floor( ( point_i_array[ point_index ] - minimum_i ) * 255 / ( maximum_i - minimum_i ) );
                         }
 
                         point = point.GetTransformedPoint( Transform );
@@ -699,6 +484,284 @@ struct CLOUD
 
         output_file_stream.close();
     }
+
+    // ~~
+
+    void WritePcfFile(
+        const string & input_file_path,
+        const string & output_file_path,
+        const COMPRESSION compression,
+        const uint16_t position_bit_count,
+        const double position_precision
+        )
+    {
+        const int64_t
+            MaximumPointCount = 65536;
+        static double
+            point_i_array[ MaximumPointCount ],
+            point_x_array[ MaximumPointCount ],
+            point_y_array[ MaximumPointCount ],
+            point_z_array[ MaximumPointCount ];
+        static uint16_t
+            point_b_array[ MaximumPointCount ],
+            point_g_array[ MaximumPointCount ],
+            point_r_array[ MaximumPointCount ];
+        bool
+            point_has_b_field,
+            point_has_g_field,
+            point_has_i_field,
+            point_has_r_field,
+            point_has_rgb_fields,
+            point_has_x_field,
+            point_has_xyz_fields,
+            point_has_y_field,
+            point_has_z_field;
+        double
+            color_maximum,
+            color_minimum,
+            color_precision,
+            intensity_maximum,
+            intensity_minimum,
+            intensity_precision,
+            minimum_b,
+            maximum_b,
+            minimum_g,
+            maximum_g,
+            minimum_i,
+            maximum_i,
+            minimum_r,
+            maximum_r,
+            minimum_x,
+            maximum_x,
+            minimum_y,
+            maximum_y,
+            minimum_z,
+            maximum_z,
+            position_maximum,
+            position_minimum;
+        int32_t
+            scan_count,
+            scan_index;
+        int64_t
+            point_count,
+            point_index;
+        uint16_t
+            color_bit_count,
+            intensity_bit_count;
+        uint64_t
+            component_index;
+        LINK_<pcf::SCAN>
+            pcf_scan;
+        LINK_<pcf::CLOUD>
+            pcf_cloud;
+        pcf::CELL
+            * pcf_cell;
+        POINT
+            point;
+        E57_SCAN
+            scan;
+
+        position_minimum = 0.0;
+        position_maximum = 0.0;
+        intensity_bit_count = 12;
+        intensity_precision = 1.0;
+        intensity_minimum = -2048.0;
+        intensity_maximum = 2047.0;
+        color_bit_count = 8;
+        color_precision = 1.0 / 255.0;
+        color_minimum = 0.0;
+        color_maximum = 255.0;
+
+        cout
+            << "Reading file : " << input_file_path << "\n";
+
+        pcf_cloud = new pcf::CLOUD();
+
+        Reader
+            file_reader( input_file_path );
+
+        scan_count = file_reader.GetData3DCount();
+        ScanVector.resize( scan_count );
+
+        for ( scan_index = 0;
+              scan_index < scan_count;
+              ++scan_index )
+        {
+            file_reader.ReadData3D( scan_index, scan.Data );
+
+            scan.PositionVector.X = scan.Data.pose.translation.x;
+            scan.PositionVector.Y = scan.Data.pose.translation.y;
+            scan.PositionVector.Z = scan.Data.pose.translation.z;
+            scan.RotationVector.X = scan.Data.pose.rotation.x;
+            scan.RotationVector.Y = scan.Data.pose.rotation.y;
+            scan.RotationVector.Z = scan.Data.pose.rotation.z;
+            scan.RotationVector.W = scan.Data.pose.rotation.w;
+
+            file_reader.GetData3DSizes(
+                scan_index,
+                scan.RowCount,
+                scan.ColumnCount,
+                scan.PointCount,
+                scan.GroupCount,
+                scan.MaximumPointCount,
+                scan.IsColumnIndex
+                );
+
+            point_has_x_field = scan.Data.pointFields.cartesianXField;
+            point_has_y_field = scan.Data.pointFields.cartesianYField;
+            point_has_z_field = scan.Data.pointFields.cartesianZField;
+            point_has_r_field = scan.Data.pointFields.colorRedField;
+            point_has_g_field = scan.Data.pointFields.colorGreenField;
+            point_has_b_field = scan.Data.pointFields.colorBlueField;
+            point_has_i_field = scan.Data.pointFields.intensityField;
+
+            point_has_xyz_fields = point_has_x_field && point_has_y_field && point_has_z_field;
+            point_has_rgb_fields = point_has_r_field && point_has_g_field && point_has_b_field;
+
+            minimum_x = scan.Data.cartesianBounds.xMinimum;
+            maximum_x = scan.Data.cartesianBounds.xMaximum;
+            minimum_y = scan.Data.cartesianBounds.yMinimum;
+            maximum_y = scan.Data.cartesianBounds.yMaximum;
+            minimum_z = scan.Data.cartesianBounds.zMinimum;
+            maximum_z = scan.Data.cartesianBounds.zMaximum;
+            minimum_r = scan.Data.colorLimits.colorRedMinimum;
+            maximum_r = scan.Data.colorLimits.colorRedMaximum;
+            minimum_g = scan.Data.colorLimits.colorGreenMinimum;
+            maximum_g = scan.Data.colorLimits.colorGreenMaximum;
+            minimum_b = scan.Data.colorLimits.colorBlueMinimum;
+            maximum_b = scan.Data.colorLimits.colorBlueMaximum;
+            minimum_i = scan.Data.intensityLimits.intensityMinimum;
+            maximum_i = scan.Data.intensityLimits.intensityMaximum;
+
+            if ( point_has_x_field
+                 && point_has_y_field
+                 && point_has_z_field )
+            {
+                pcf_scan = new SCAN();
+
+                if ( scan_index == 0 )
+                {
+                    if ( compression == COMPRESSION::None )
+                    {
+                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "X", COMPRESSION::None, 32, 0.0, 0.0 ) );
+                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "Y", COMPRESSION::None, 32, 0.0, 0.0 ) );
+                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "Z", COMPRESSION::None, 32, 0.0, 0.0 ) );
+
+                        if ( point_has_i_field )
+                        {
+                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "I", COMPRESSION::None, 32, 0.0, 0.0 ) );
+                        }
+
+                        if ( point_has_rgb_fields )
+                        {
+                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "R", COMPRESSION::None, 32, 0.0, 0.0 ) );
+                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "G", COMPRESSION::None, 32, 0.0, 0.0 ) );
+                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "B", COMPRESSION::None, 32, 0.0, 0.0 ) );
+                        }
+                    }
+                    else
+                    {
+                        assert( compression == COMPRESSION::Discretization );
+
+                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "X", COMPRESSION::Discretization, position_bit_count, position_precision, position_minimum, position_maximum ) );
+                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "Y", COMPRESSION::Discretization, position_bit_count, position_precision, position_minimum, position_maximum ) );
+                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "Z", COMPRESSION::Discretization, position_bit_count, position_precision, position_minimum, position_maximum ) );
+
+                        if ( point_has_i_field )
+                        {
+                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "I", COMPRESSION::Discretization, intensity_bit_count, intensity_precision, intensity_minimum, intensity_maximum ) );
+                        }
+
+                        if ( point_has_rgb_fields )
+                        {
+                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "R", COMPRESSION::Discretization, color_bit_count, color_precision, color_minimum, color_maximum ) );
+                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "G", COMPRESSION::Discretization, color_bit_count, color_precision, color_minimum, color_maximum ) );
+                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "B", COMPRESSION::Discretization, color_bit_count, color_precision, color_minimum, color_maximum ) );
+                        }
+                    }
+                }
+
+                CompressedVectorReader
+                    compressed_vector_reader
+                        = file_reader.SetUpData3DPointsData(
+                            scan_index,
+                            MaximumPointCount,
+                            point_x_array,
+                            point_y_array,
+                            point_z_array,
+                            nullptr,
+                            point_i_array,
+                            nullptr,
+                            point_r_array,
+                            point_g_array,
+                            point_b_array,
+                            nullptr,
+                            nullptr,
+                            nullptr,
+                            nullptr,
+                            nullptr,
+                            nullptr
+                            );
+
+                while ( ( point_count = compressed_vector_reader.read() ) > 0 )
+                {
+                    pcf_scan->PointCount = point_count;
+                    pcf_scan->ColumnCount = point_count;
+                    pcf_scan->RowCount = 1;
+
+                    for ( point_index = 0;
+                          point_index < point_count;
+                          ++point_index )
+                    {
+                        point.PositionVector.X = point_x_array[ point_index ];
+                        point.PositionVector.Y = point_y_array[ point_index ];
+                        point.PositionVector.Z = point_z_array[ point_index ];
+
+                        if ( point_has_i_field )
+                        {
+                            point.ColorVector.W = floor( ( point_i_array[ point_index ] - minimum_i ) * 255 / ( maximum_i - minimum_i ) );
+                        }
+
+                        if ( point_has_rgb_fields )
+                        {
+                            point.ColorVector.X = floor( ( point_r_array[ point_index ] - minimum_r ) * 255 / ( maximum_r - minimum_r ) );
+                            point.ColorVector.Y = floor( ( point_g_array[ point_index ] - minimum_g ) * 255 / ( maximum_g - minimum_g ) );
+                            point.ColorVector.Z = floor( ( point_b_array[ point_index ] - minimum_b ) * 255 / ( maximum_b - minimum_b ) );
+                        }
+
+                        point = point.GetTransformedPoint( Transform );
+
+                        pcf_cell = pcf_scan->GetCell( pcf_cloud->ComponentVector, point.PositionVector.X, point.PositionVector.Y, point.PositionVector.Z );
+                        pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, 0, point.PositionVector.X );
+                        pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, 1, point.PositionVector.Y );
+                        pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, 2, point.PositionVector.Z );
+                        component_index = 3;
+
+                        if ( point_has_i_field )
+                        {
+                            pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, component_index, point.ColorVector.W );
+                            ++component_index;
+                        }
+
+                        if ( point_has_rgb_fields )
+                        {
+                            pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, component_index, point.ColorVector.X );
+                            pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, component_index + 1, point.ColorVector.Y );
+                            pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, component_index + 2, point.ColorVector.Z );
+                        }
+
+                        ++( pcf_cell->PointCount );
+                    }
+                }
+
+                pcf_cloud->ScanVector.push_back( pcf_scan );
+            }
+        }
+
+        cout
+            << "Writing file : " << output_file_path << "\n";
+
+    }
 };
 
 // -- FUNCTIONS
@@ -722,7 +785,7 @@ int main(
 {
     string
         file_path;
-    CLOUD
+    E57_CLOUD
         cloud;
 
     --argument_count;
@@ -826,7 +889,12 @@ int main(
             else if ( argument_count >= 3
                       && !strcmp( argument_array[ 0 ], "--write-xyz-cloud" ) )
             {
-                cloud.ConvertFile( file_path, argument_array[ 1 ], argument_array[ 2 ], "xyz" );
+                cloud.WriteXyzOrPtsFile(
+                    file_path,
+                    argument_array[ 1 ],
+                    argument_array[ 2 ],
+                    "xyz"
+                    );
 
                 argument_count -= 3;
                 argument_array += 3;
@@ -834,7 +902,26 @@ int main(
             else if ( argument_count >= 3
                       && !strcmp( argument_array[ 0 ], "--write-pts-cloud" ) )
             {
-                cloud.ConvertFile( file_path, argument_array[ 1 ], argument_array[ 2 ], "pts" );
+                cloud.WriteXyzOrPtsFile(
+                    file_path,
+                    argument_array[ 1 ],
+                    argument_array[ 2 ],
+                    "pts"
+                    );
+
+                argument_count -= 3;
+                argument_array += 3;
+            }
+            else if ( argument_count >= 4
+                      && !strcmp( argument_array[ 0 ], "--write-pcf-cloud" ) )
+            {
+                cloud.WritePcfFile(
+                    file_path,
+                    argument_array[ 1 ],
+                    ( COMPRESSION )stol( argument_array[ 2 ] ),
+                    ( uint16_t )stol( argument_array[ 3 ] ),
+                    stod( argument_array[ 4 ] )
+                    );
 
                 argument_count -= 3;
                 argument_array += 3;
@@ -883,8 +970,9 @@ int main(
             << "    --color-translation <r> <g> <b> <i>\n"
             << "    --decimation-count <decimation count>\n"
             << "    --read-e57-cloud <file path>\n"
-            << "    --write-xyz-cloud <file path>\n"
-            << "    --write-pts-cloud <file path> <line format>\n";
+            << "    --write-xyz-cloud <file path> <line format>\n"
+            << "    --write-pts-cloud <file path> <line format>\n"
+            << "    --write-pcf-cloud <file path> <compression> <position bit count> <position precision>\n";
 
         return -1;
     }
