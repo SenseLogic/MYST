@@ -1,6 +1,6 @@
-![](https://github.com/senselogic/XENIUS/blob/master/LOGO/xenius.png)
+![](https://github.com/senselogic/NUBEA/blob/master/LOGO/nubea.png)
 
-# Xenius
+# Nubea
 
 E57 file converter.
 

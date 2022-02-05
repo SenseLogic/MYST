@@ -1,21 +1,21 @@
 /*
-    This file is part of the Xenius distribution.
+    This file is part of the Nubea distribution.
 
-    https://github.com/senselogic/XENIUS
+    https://github.com/senselogic/NUBEA
 
     Copyright (C) 2021 Eric Pelzer (ecstatic.coder@gmail.com)
 
-    Xenius is free software: you can redistribute it and/or modify
+    Nubea is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, version 3.
 
-    Xenius is distributed in the hope that it will be useful,
+    Nubea is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with Xenius.  If not, see <http://www.gnu.org/licenses/>.
+    along with Nubea.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 // -- IMPORTS
@@ -197,6 +197,8 @@ struct E57_SCAN
 {
     // -- ATTRIBUTES
 
+    string
+        Name;
     VECTOR_3
         PositionVector;
     VECTOR_4
@@ -285,8 +287,7 @@ struct E57_CLOUD
         E57_SCAN
             * scan;
 
-        cout
-            << "Reading file : " << input_file_path << "\n";
+        cout << "Reading file : " << input_file_path << "\n";
 
         Reader
             file_reader( input_file_path );
@@ -303,6 +304,7 @@ struct E57_CLOUD
             scan = &ScanVector[ scan_index ];
             file_reader.ReadData3D( scan_index, scan->Data );
 
+            scan->Name = scan->Data.name;
             scan->PositionVector.X = scan->Data.pose.translation.x;
             scan->PositionVector.Y = scan->Data.pose.translation.y;
             scan->PositionVector.Z = scan->Data.pose.translation.z;
@@ -324,8 +326,7 @@ struct E57_CLOUD
             point_count += scan->PointCount;
         }
 
-        cout
-            << "Writing file : " << output_file_path << "\n";
+        cout << "Writing file : " << output_file_path << "\n";
 
         output_file_stream.open( output_file_path );
 
@@ -572,8 +573,7 @@ struct E57_CLOUD
         color_minimum = 0.0;
         color_maximum = 255.0;
 
-        cout
-            << "Reading file : " << input_file_path << "\n";
+        cout << "Reading file : " << input_file_path << "\n";
 
         pcf_cloud = new pcf::CLOUD();
 
@@ -589,6 +589,7 @@ struct E57_CLOUD
         {
             file_reader.ReadData3D( scan_index, scan.Data );
 
+            scan.Name = scan.Data.name;
             scan.PositionVector.X = scan.Data.pose.translation.x;
             scan.PositionVector.Y = scan.Data.pose.translation.y;
             scan.PositionVector.Z = scan.Data.pose.translation.z;
@@ -705,9 +706,13 @@ struct E57_CLOUD
 
                 while ( ( point_count = compressed_vector_reader.read() ) > 0 )
                 {
+                    pcf_scan->Name = scan.Name;
                     pcf_scan->PointCount = point_count;
                     pcf_scan->ColumnCount = point_count;
                     pcf_scan->RowCount = 1;
+                    pcf_scan->PositionVector = scan.PositionVector;
+                    pcf_scan->RotationVector = scan.RotationVector;
+                    pcf_scan->SetAxisVectors();
 
                     for ( point_index = 0;
                           point_index < point_count;
@@ -758,9 +763,9 @@ struct E57_CLOUD
             }
         }
 
-        cout
-            << "Writing file : " << output_file_path << "\n";
+        cout << "Writing file : " << output_file_path << "\n";
 
+        pcf_cloud->WritePcfFile( output_file_path );
     }
 };
 
@@ -918,13 +923,13 @@ int main(
                 cloud.WritePcfFile(
                     file_path,
                     argument_array[ 1 ],
-                    ( COMPRESSION )stol( argument_array[ 2 ] ),
-                    ( uint16_t )stol( argument_array[ 3 ] ),
-                    stod( argument_array[ 4 ] )
+                    ( stol( argument_array[ 2 ] ) < 32 ) ? COMPRESSION::Discretization : COMPRESSION::None,
+                    ( uint16_t )stol( argument_array[ 2 ] ),
+                    stod( argument_array[ 3 ] )
                     );
 
-                argument_count -= 3;
-                argument_array += 3;
+                argument_count -= 4;
+                argument_array += 4;
             }
             else
             {
@@ -959,7 +964,7 @@ int main(
     {
         cerr
             << "Usage :\n"
-            << "    xenius <options>\n"
+            << "    nubea <options>\n"
             << "Options :\n"
             << "    --position-offset <x> <y> <z>\n"
             << "    --position-scaling <x> <y> <z>\n"
@@ -972,7 +977,7 @@ int main(
             << "    --read-e57-cloud <file path>\n"
             << "    --write-xyz-cloud <file path> <line format>\n"
             << "    --write-pts-cloud <file path> <line format>\n"
-            << "    --write-pcf-cloud <file path> <compression> <position bit count> <position precision>\n";
+            << "    --write-pcf-cloud <file path> <position bit count> <position precision>\n";
 
         return -1;
     }
