@@ -2,7 +2,7 @@
 
 # Nubea
 
-E57 file converter.
+E57 point cloud converter.
 
 ## Command line
 
