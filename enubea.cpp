@@ -1,21 +1,21 @@
 /*
-    This file is part of the Nubea distribution.
+    This file is part of the Enubea distribution.
 
-    https://github.com/senselogic/NUBEA
+    https://github.com/senselogic/ENUBEA
 
     Copyright (C) 2021 Eric Pelzer (ecstatic.coder@gmail.com)
 
-    Nubea is free software: you can redistribute it and/or modify
+    Enubea is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, version 3.
 
-    Nubea is distributed in the hope that it will be useful,
+    Enubea is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with Nubea.  If not, see <http://www.gnu.org/licenses/>.
+    along with Enubea.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 // -- IMPORTS
@@ -1344,7 +1344,7 @@ int main(
     {
         cerr
             << "Usage :\n"
-            << "    nubea <options>\n"
+            << "    enubea <options>\n"
             << "Options :\n"
             << "    --verbose\n"
             << "    --position-offset <x> <y> <z>\n"

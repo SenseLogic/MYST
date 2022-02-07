@@ -1,13 +1,13 @@
-![](https://github.com/senselogic/NUBEA/blob/master/LOGO/nubea.png)
+![](https://github.com/senselogic/ENUBEA/blob/master/LOGO/enubea.png)
 
-# Nubea
+# Enubea
 
 E57 point cloud converter.
 
 ## Command line
 
 ```bash
-nubea [options]
+enubea [options]
 ```
 
 ### Options
