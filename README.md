@@ -53,6 +53,7 @@ B : blue (from 0 to 255)
 
 ### Linux
 
+*   run `update.sh`
 *   run `get.sh`
 *   run `make.sh`
 
@@ -60,6 +61,7 @@ B : blue (from 0 to 255)
 
 *   install [Visual C++ 2019 Community](https://docs.microsoft.com/en-us/visualstudio/releases/2019/redistribution#vs2019-download)
 *   install [Cmake 3.21](https://github.com/Kitware/CMake/releases/download/v3.21.0-rc3/cmake-3.21.0-rc3-windows-x86_64.msi)
+*   run `update.bat`
 *   run `XERCES/make.bat`
 *   run `make.bat`
 
