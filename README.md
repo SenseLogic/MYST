@@ -73,7 +73,7 @@ B : blue (from 0 to 255)
 
 ## Version
 
-0.2
+0.3
 
 ## Author
 
