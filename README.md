@@ -7,7 +7,7 @@ E57 point cloud converter.
 ## Command line
 
 ```bash
-nubea <options>
+nubea [options]
 ```
 
 ### Options
