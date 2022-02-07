@@ -13,6 +13,7 @@ nubea <options>
 ### Options
 
 ```bash
+--verbose : show the processing messages
 --position-offset <x> <y> <z> : set the loading position offset
 --position-scaling <x> <y> <z> : set the loading position scaling
 --position-rotation <x> <y> <z> : set the loading position rotation
@@ -22,24 +23,30 @@ nubea <options>
 --color-translation <r> <g> <b> <i> : set the loading color translation
 --decimation-count <decimation count> : set the loading decimation count
 --read-e57-cloud <file path> : read an E57 point cloud
---write-xyz-cloud <file path> <line format> : write an XYZ point cloud
---write-pts-cloud <file path> <line format> : write a PTS point cloud
---write-pcf-cloud <file path> <position bit count> <position precision> : write a PCF point cloud
+--write-xyz-cloud <file path> <component format> : write an XYZ point cloud
+--write-pts-cloud <file path> <component format> : write a PTS point cloud
+--write-ptx-cloud <file path> <component format> : write a PTX point cloud
+--write-pcf-cloud <file path> <component format> <position bit count> <position precision> : write a PCF point cloud
 ```
 
-### Output line format
+### Point format
 
 ```
 x : -X
-y : -Y
-z : -Z
 X : +X
+y : -Y
 Y : +Y
+z : -Z
 Z : +Z
-R : red
-G : green
-B : blue
-I : intensity
+n : intensity (from -2048 to 2047)
+i : intensity (from 0 to 1)
+I : intensity (from 0 to 255)
+r : red (from 0 to 1)
+R : red (from 0 to 255)
+g : green (from 0 to 1)
+G : green (from 0 to 255)
+b : blue (from 0 to 1)
+B : blue (from 0 to 255)
 ```
 
 ## Installation
@@ -53,10 +60,14 @@ I : intensity
 
 *   install [Visual C++ 2019](https://visualstudio.microsoft.com/fr/vs/community/)
 *   install [Cmake 3.21](https://github.com/Kitware/CMake/releases/download/v3.21.0-rc3/cmake-3.21.0-rc3-windows-x86_64.msi)
-*   install [Boost 1.76.0](https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.7z) in `BOOST/boost_1_76_0`
-*   install [Xerces 3.2.3](https://downloads.apache.org//xerces/c/3/sources/xerces-c-3.2.3.zip) in `XERCES/xerces-c-3.2.3`
 *   run `XERCES/make.bat`
 *   run `make.bat`
+
+## Dependencies
+
+*   [PCF](https://github.com/senselogic/PCF/tree/master/CODE/CPP)
+*   [Boost 1.76.0](https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.7z)
+*   [Xerces 3.2.3](https://downloads.apache.org/xerces/c/3/sources/xerces-c-3.2.3.zip)
 
 ## Version
 

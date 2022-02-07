@@ -50,6 +50,8 @@ typedef struct _SYSTEMTIME
 
 using namespace std;
 using namespace e57;
+using pcf::Abort;
+using pcf::GetText;
 using pcf::CELL;
 using pcf::CLOUD;
 using pcf::COMPONENT;
@@ -113,7 +115,125 @@ struct POINT
         ColorVector.SetNull();
     }
 
+    // -- OPERATORS
+
+    bool operator==(
+        const POINT & point
+        ) const
+    {
+        return
+            PositionVector == point.PositionVector
+            && ColorVector == point.ColorVector;
+    }
+
+    // ~~
+
+    bool operator!=(
+        const POINT & point
+        ) const
+    {
+        return
+            PositionVector != point.PositionVector
+            || ColorVector != point.ColorVector;
+    }
+
     // -- INQUIRIES
+
+    void Dump(
+        ) const
+    {
+        cout
+            << GetText( PositionVector.X )
+            << " "
+            << GetText( PositionVector.Y )
+            << " "
+            << GetText( PositionVector.Z )
+            << " "
+            << GetText( ColorVector.W )
+            << " "
+            << GetText( ColorVector.X )
+            << " "
+            << GetText( ColorVector.Y )
+            << " "
+            << GetText( ColorVector.Z )
+            << "\n";
+    }
+
+    // ~~
+
+    double GetComponentValue(
+        char component_character
+        )
+    {
+        if ( component_character == 'x' )
+        {
+            return -PositionVector.X;
+        }
+        else if ( component_character == 'X' )
+        {
+            return PositionVector.X;
+        }
+        else if ( component_character == 'y' )
+        {
+            return -PositionVector.Y;
+        }
+        else if ( component_character == 'Y' )
+        {
+            return PositionVector.Y;
+        }
+        else if ( component_character == 'z' )
+        {
+            return -PositionVector.Z;
+        }
+        else if ( component_character == 'Z' )
+        {
+            return PositionVector.Z;
+        }
+        else if ( component_character == 'n' )
+        {
+            return -2048 + ColorVector.W * 4095;
+        }
+        else if ( component_character == 'i' )
+        {
+            return ColorVector.W;
+        }
+        else if ( component_character == 'I' )
+        {
+            return ColorVector.W * 255.0;
+        }
+        else if ( component_character == 'r' )
+        {
+            return ColorVector.X;
+        }
+        else if ( component_character == 'R' )
+        {
+            return ColorVector.X * 255.0;
+        }
+        else if ( component_character == 'g' )
+        {
+            return ColorVector.Y;
+        }
+        else if ( component_character == 'G' )
+        {
+            return ColorVector.Y * 255.0;
+        }
+        else if ( component_character == 'b' )
+        {
+            return ColorVector.Z;
+        }
+        else if ( component_character == 'B' )
+        {
+            return ColorVector.Z * 255.0;
+        }
+        else
+        {
+            Abort( "Invalid component format" );
+
+            return 0.0;
+        }
+    }
+
+    // ~~
 
     POINT GetTransformedPoint(
         const TRANSFORM & transform
@@ -221,17 +341,104 @@ struct E57_CLOUD
 {
     // -- ATTRIBUTES
 
+    bool
+        HasTransform,
+        IsVerbose;
     TRANSFORM
         Transform;
     vector<E57_SCAN>
         ScanVector;
 
+    // -- CONSTRUCTORS
+
+    E57_CLOUD(
+        ) :
+        HasTransform( false ),
+        IsVerbose( false ),
+        Transform(),
+        ScanVector()
+    {
+    }
+
+    // -- INQUIRIES
+
+    string GetComponentName(
+        char component_character
+        )
+    {
+        if ( component_character == 'x'
+             || component_character == 'X' )
+        {
+            return "X";
+        }
+        else if ( component_character == 'y'
+                 || component_character == 'Y' )
+        {
+            return "Y";
+        }
+        else if ( component_character == 'z'
+                 || component_character == 'Z' )
+        {
+            return "Z";
+        }
+        else if ( component_character == 'n'
+                 || component_character == 'i'
+                 || component_character == 'I' )
+        {
+            return "I";
+        }
+        else if ( component_character == 'r'
+                 || component_character == 'R' )
+        {
+            return "R";
+        }
+        else if ( component_character == 'g'
+                 || component_character == 'G' )
+        {
+            return "G";
+        }
+        else if ( component_character == 'b'
+                 || component_character == 'B' )
+        {
+            return "B";
+        }
+        else
+        {
+            Abort( "Invalid component format" );
+
+            return "";
+        }
+    }
+
     // -- OPERATIONS
 
-    void WriteXyzOrPtsFile(
+    void TransformPoint(
+        POINT & point
+        )
+    {
+        if ( IsVerbose )
+        {
+            point.Dump();
+        }
+
+        if ( HasTransform )
+        {
+            point = point.GetTransformedPoint( Transform );
+
+            if ( IsVerbose )
+            {
+                cout << "=> ";
+                point.Dump();
+            }
+        }
+    }
+
+    // ~~
+
+    void WriteXyzFile(
         const string & input_file_path,
         const string & output_file_path,
-        const string & output_line_format,
+        const string & output_component_format,
         const string & output_file_format
         )
     {
@@ -252,11 +459,8 @@ struct E57_CLOUD
             point_has_i_field,
             point_has_r_field,
             point_has_x_field,
-            point_has_xyz_fields,
             point_has_y_field,
             point_has_z_field;
-        char
-            field_character;
         double
             minimum_b,
             maximum_b,
@@ -276,16 +480,23 @@ struct E57_CLOUD
             scan_count,
             scan_index;
         int64_t
-            field_count,
-            field_index,
             point_count,
             point_index;
+        uint64_t
+            component_count,
+            component_index;
         ofstream
             output_file_stream;
         POINT
             point;
         E57_SCAN
             * scan;
+        VECTOR_3
+            x_axis_vector,
+            y_axis_vector,
+            z_axis_vector;
+
+        component_count = output_component_format.size();
 
         cout << "Reading file : " << input_file_path << "\n";
 
@@ -335,23 +546,82 @@ struct E57_CLOUD
             output_file_stream << point_count << "\n";
         }
 
-        field_count = output_line_format.size();
-
         for ( scan_index = 0;
               scan_index < scan_count;
               ++scan_index )
         {
             scan = &ScanVector[ scan_index ];
 
+            if ( output_file_format == "ptx" )
+            {
+                scan->RotationVector.GetAxisVectors(
+                    x_axis_vector,
+                    y_axis_vector,
+                    z_axis_vector
+                    );
+
+                output_file_stream
+                    << scan->ColumnCount
+                    << "\n"
+                    << scan->RowCount
+                    << "\n"
+                    << scan->PositionVector.X
+                    << " "
+                    << scan->PositionVector.Y
+                    << " "
+                    << scan->PositionVector.Z
+                    << "\n"
+                    << x_axis_vector.X
+                    << " "
+                    << x_axis_vector.Y
+                    << " "
+                    << x_axis_vector.Z
+                    << "\n"
+                    << y_axis_vector.X
+                    << " "
+                    << y_axis_vector.Y
+                    << " "
+                    << y_axis_vector.Z
+                    << "\n"
+                    << z_axis_vector.X
+                    << " "
+                    << z_axis_vector.Y
+                    << " "
+                    << z_axis_vector.Z
+                    << "\n"
+                    << x_axis_vector.X
+                    << " "
+                    << x_axis_vector.Y
+                    << " "
+                    << x_axis_vector.Z
+                    << " 0\n"
+                    << y_axis_vector.X
+                    << " "
+                    << y_axis_vector.Y
+                    << " "
+                    << y_axis_vector.Z
+                    << " 0\n"
+                    << z_axis_vector.X
+                    << " "
+                    << z_axis_vector.Y
+                    << " "
+                    << z_axis_vector.Z
+                    << " 0\n"
+                    << scan->PositionVector.X
+                    << " "
+                    << scan->PositionVector.Y
+                    << " "
+                    << scan->PositionVector.Z
+                    << " 1\n";
+            }
+
             point_has_x_field = scan->Data.pointFields.cartesianXField;
             point_has_y_field = scan->Data.pointFields.cartesianYField;
             point_has_z_field = scan->Data.pointFields.cartesianZField;
+            point_has_i_field = scan->Data.pointFields.intensityField;
             point_has_r_field = scan->Data.pointFields.colorRedField;
             point_has_g_field = scan->Data.pointFields.colorGreenField;
             point_has_b_field = scan->Data.pointFields.colorBlueField;
-            point_has_i_field = scan->Data.pointFields.intensityField;
-
-            point_has_xyz_fields = point_has_x_field && point_has_y_field && point_has_z_field;
 
             minimum_x = scan->Data.cartesianBounds.xMinimum;
             maximum_x = scan->Data.cartesianBounds.xMaximum;
@@ -359,16 +629,56 @@ struct E57_CLOUD
             maximum_y = scan->Data.cartesianBounds.yMaximum;
             minimum_z = scan->Data.cartesianBounds.zMinimum;
             maximum_z = scan->Data.cartesianBounds.zMaximum;
+            minimum_i = scan->Data.intensityLimits.intensityMinimum;
+            maximum_i = scan->Data.intensityLimits.intensityMaximum;
             minimum_r = scan->Data.colorLimits.colorRedMinimum;
             maximum_r = scan->Data.colorLimits.colorRedMaximum;
             minimum_g = scan->Data.colorLimits.colorGreenMinimum;
             maximum_g = scan->Data.colorLimits.colorGreenMaximum;
             minimum_b = scan->Data.colorLimits.colorBlueMinimum;
             maximum_b = scan->Data.colorLimits.colorBlueMaximum;
-            minimum_i = scan->Data.intensityLimits.intensityMinimum;
-            maximum_i = scan->Data.intensityLimits.intensityMaximum;
 
-            if ( point_has_xyz_fields )
+            if ( IsVerbose )
+            {
+                if ( point_has_x_field )
+                {
+                    cout << "X : " << GetText( minimum_x ) << " / " << GetText( maximum_x ) << "\n";
+                }
+
+                if ( point_has_y_field )
+                {
+                    cout << "Y : " << GetText( minimum_y ) << " / " << GetText( maximum_y ) << "\n";
+                }
+
+                if ( point_has_z_field )
+                {
+                    cout << "Z : " << GetText( minimum_z ) << " / " << GetText( maximum_z ) << "\n";
+                }
+
+                if ( point_has_i_field )
+                {
+                    cout << "I : " << GetText( minimum_i ) << " / " << GetText( maximum_i ) << "\n";
+                }
+
+                if ( point_has_r_field )
+                {
+                    cout << "R : " << GetText( minimum_r ) << " / " << GetText( maximum_r ) << "\n";
+                }
+
+                if ( point_has_g_field )
+                {
+                    cout << "G : " << GetText( minimum_g ) << " / " << GetText( maximum_g ) << "\n";
+                }
+
+                if ( point_has_b_field )
+                {
+                    cout << "B : " << GetText( minimum_b ) << " / " << GetText( maximum_b ) << "\n";
+                }
+            }
+
+            if ( point_has_x_field
+                 && point_has_y_field
+                 && point_has_z_field )
             {
                 CompressedVectorReader
                     compressed_vector_reader
@@ -404,77 +714,36 @@ struct E57_CLOUD
 
                         if ( point_has_r_field )
                         {
-                            point.ColorVector.X = floor( ( point_r_array[ point_index ] - minimum_r ) * 255 / ( maximum_r - minimum_r ) );
+                            point.ColorVector.X = ( point_r_array[ point_index ] - minimum_r ) / ( maximum_r - minimum_r );
                         }
 
                         if ( point_has_g_field )
                         {
-                            point.ColorVector.Y = floor( ( point_g_array[ point_index ] - minimum_g ) * 255 / ( maximum_g - minimum_g ) );
+                            point.ColorVector.Y = ( point_g_array[ point_index ] - minimum_g ) / ( maximum_g - minimum_g );
                         }
 
                         if ( point_has_b_field )
                         {
-                            point.ColorVector.Z = floor( ( point_b_array[ point_index ] - minimum_b ) * 255 / ( maximum_b - minimum_b ) );
+                            point.ColorVector.Z = ( point_b_array[ point_index ] - minimum_b ) / ( maximum_b - minimum_b );
                         }
 
                         if ( point_has_i_field )
                         {
-                            point.ColorVector.W = floor( ( point_i_array[ point_index ] - minimum_i ) * 255 / ( maximum_i - minimum_i ) );
+                            point.ColorVector.W = ( point_i_array[ point_index ] - minimum_i ) / ( maximum_i - minimum_i );
                         }
 
-                        point = point.GetTransformedPoint( Transform );
+                        TransformPoint( point );
 
-                        for ( field_index = 0;
-                              field_index < field_count;
-                              ++field_index )
+                        for ( component_index = 0;
+                              component_index < component_count;
+                              ++component_index )
                         {
-                            if ( field_index > 0 )
+                            if ( component_index > 0 )
                             {
                                 output_file_stream << " ";
                             }
 
-                            field_character = output_line_format[ field_index ];
-
-                            if ( field_character == 'x' )
-                            {
-                                output_file_stream << ( -point.PositionVector.X );
-                            }
-                            else if ( field_character == 'y' )
-                            {
-                                output_file_stream << ( -point.PositionVector.Y );
-                            }
-                            else if ( field_character == 'z' )
-                            {
-                                output_file_stream << ( -point.PositionVector.Z );
-                            }
-                            else if ( field_character == 'X' )
-                            {
-                                output_file_stream << point.PositionVector.X;
-                            }
-                            else if ( field_character == 'Y' )
-                            {
-                                output_file_stream << point.PositionVector.Y;
-                            }
-                            else if ( field_character == 'Z' )
-                            {
-                                output_file_stream << point.PositionVector.Z;
-                            }
-                            else if ( field_character == 'R' )
-                            {
-                                output_file_stream << point.ColorVector.X;
-                            }
-                            else if ( field_character == 'G' )
-                            {
-                                output_file_stream << point.ColorVector.Y;
-                            }
-                            else if ( field_character == 'B' )
-                            {
-                                output_file_stream << point.ColorVector.Z;
-                            }
-                            else if ( field_character == 'I' )
-                            {
-                                output_file_stream << point.ColorVector.W;
-                            }
+                            output_file_stream << point.GetComponentValue( output_component_format[ component_index ] );
                         }
 
                         output_file_stream << "\n";
@@ -491,6 +760,7 @@ struct E57_CLOUD
     void WritePcfFile(
         const string & input_file_path,
         const string & output_file_path,
+        const string & output_component_format,
         const COMPRESSION compression,
         const uint16_t position_bit_count,
         const double position_precision
@@ -512,18 +782,15 @@ struct E57_CLOUD
             point_has_g_field,
             point_has_i_field,
             point_has_r_field,
-            point_has_rgb_fields,
             point_has_x_field,
-            point_has_xyz_fields,
             point_has_y_field,
             point_has_z_field;
+        char
+            component_character,
+            x_component_character,
+            y_component_character,
+            z_component_character;
         double
-            color_maximum,
-            color_minimum,
-            color_precision,
-            intensity_maximum,
-            intensity_minimum,
-            intensity_precision,
             minimum_b,
             maximum_b,
             minimum_g,
@@ -537,19 +804,15 @@ struct E57_CLOUD
             minimum_y,
             maximum_y,
             minimum_z,
-            maximum_z,
-            position_maximum,
-            position_minimum;
+            maximum_z;
         int32_t
             scan_count,
             scan_index;
         int64_t
             point_count,
             point_index;
-        uint16_t
-            color_bit_count,
-            intensity_bit_count;
         uint64_t
+            component_count,
             component_index;
         LINK_<pcf::SCAN>
             pcf_scan;
@@ -562,23 +825,14 @@ struct E57_CLOUD
         E57_SCAN
             scan;
 
-        position_minimum = 0.0;
-        position_maximum = 0.0;
-        intensity_bit_count = 12;
-        intensity_precision = 1.0;
-        intensity_minimum = -2048.0;
-        intensity_maximum = 2047.0;
-        color_bit_count = 8;
-        color_precision = 1.0 / 255.0;
-        color_minimum = 0.0;
-        color_maximum = 255.0;
-
         cout << "Reading file : " << input_file_path << "\n";
 
         pcf_cloud = new pcf::CLOUD();
 
         Reader
             file_reader( input_file_path );
+
+        component_count = output_component_format.size();
 
         scan_count = file_reader.GetData3DCount();
         ScanVector.resize( scan_count );
@@ -611,13 +865,10 @@ struct E57_CLOUD
             point_has_x_field = scan.Data.pointFields.cartesianXField;
             point_has_y_field = scan.Data.pointFields.cartesianYField;
             point_has_z_field = scan.Data.pointFields.cartesianZField;
+            point_has_i_field = scan.Data.pointFields.intensityField;
             point_has_r_field = scan.Data.pointFields.colorRedField;
             point_has_g_field = scan.Data.pointFields.colorGreenField;
             point_has_b_field = scan.Data.pointFields.colorBlueField;
-            point_has_i_field = scan.Data.pointFields.intensityField;
-
-            point_has_xyz_fields = point_has_x_field && point_has_y_field && point_has_z_field;
-            point_has_rgb_fields = point_has_r_field && point_has_g_field && point_has_b_field;
 
             minimum_x = scan.Data.cartesianBounds.xMinimum;
             maximum_x = scan.Data.cartesianBounds.xMaximum;
@@ -625,62 +876,170 @@ struct E57_CLOUD
             maximum_y = scan.Data.cartesianBounds.yMaximum;
             minimum_z = scan.Data.cartesianBounds.zMinimum;
             maximum_z = scan.Data.cartesianBounds.zMaximum;
+            minimum_i = scan.Data.intensityLimits.intensityMinimum;
+            maximum_i = scan.Data.intensityLimits.intensityMaximum;
             minimum_r = scan.Data.colorLimits.colorRedMinimum;
             maximum_r = scan.Data.colorLimits.colorRedMaximum;
             minimum_g = scan.Data.colorLimits.colorGreenMinimum;
             maximum_g = scan.Data.colorLimits.colorGreenMaximum;
             minimum_b = scan.Data.colorLimits.colorBlueMinimum;
             maximum_b = scan.Data.colorLimits.colorBlueMaximum;
-            minimum_i = scan.Data.intensityLimits.intensityMinimum;
-            maximum_i = scan.Data.intensityLimits.intensityMaximum;
+
+            if ( IsVerbose )
+            {
+                if ( point_has_x_field )
+                {
+                    cout << "X : " << GetText( minimum_x ) << " / " << GetText( maximum_x ) << "\n";
+                }
+
+                if ( point_has_y_field )
+                {
+                    cout << "Y : " << GetText( minimum_y ) << " / " << GetText( maximum_y ) << "\n";
+                }
+
+                if ( point_has_z_field )
+                {
+                    cout << "Z : " << GetText( minimum_z ) << " / " << GetText( maximum_z ) << "\n";
+                }
+
+                if ( point_has_i_field )
+                {
+                    cout << "I : " << GetText( minimum_i ) << " / " << GetText( maximum_i ) << "\n";
+                }
+
+                if ( point_has_r_field )
+                {
+                    cout << "R : " << GetText( minimum_r ) << " / " << GetText( maximum_r ) << "\n";
+                }
+
+                if ( point_has_g_field )
+                {
+                    cout << "G : " << GetText( minimum_g ) << " / " << GetText( maximum_g ) << "\n";
+                }
+
+                if ( point_has_b_field )
+                {
+                    cout << "B : " << GetText( minimum_b ) << " / " << GetText( maximum_b ) << "\n";
+                }
+            }
 
             if ( point_has_x_field
                  && point_has_y_field
                  && point_has_z_field )
             {
                 pcf_scan = new SCAN();
+                pcf_scan->Name = scan.Name;
+                pcf_scan->PointCount = scan.PointCount;
+                pcf_scan->ColumnCount = scan.ColumnCount;
+                pcf_scan->RowCount = scan.RowCount;
+                pcf_scan->PositionVector = scan.PositionVector;
+                pcf_scan->RotationVector = scan.RotationVector;
+                pcf_scan->SetAxisVectors();
 
-                if ( scan_index == 0 )
+                x_component_character = 'X';
+                y_component_character = 'Y';
+                z_component_character = 'Z';
+
+                for ( component_index = 0;
+                      component_index < component_count;
+                      ++component_index )
                 {
+                    component_character = output_component_format[ component_index ];
+
                     if ( compression == COMPRESSION::None )
                     {
-                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "X", COMPRESSION::None, 32, 0.0, 0.0 ) );
-                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "Y", COMPRESSION::None, 32, 0.0, 0.0 ) );
-                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "Z", COMPRESSION::None, 32, 0.0, 0.0 ) );
-
-                        if ( point_has_i_field )
-                        {
-                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "I", COMPRESSION::None, 32, 0.0, 0.0 ) );
-                        }
-
-                        if ( point_has_rgb_fields )
-                        {
-                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "R", COMPRESSION::None, 32, 0.0, 0.0 ) );
-                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "G", COMPRESSION::None, 32, 0.0, 0.0 ) );
-                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "B", COMPRESSION::None, 32, 0.0, 0.0 ) );
-                        }
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( GetComponentName( component_character ), COMPRESSION::None, 32, 0.0, 0.0, 0.0 )
+                            );
                     }
                     else
                     {
                         assert( compression == COMPRESSION::Discretization );
 
-                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "X", COMPRESSION::Discretization, position_bit_count, position_precision, position_minimum, position_maximum ) );
-                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "Y", COMPRESSION::Discretization, position_bit_count, position_precision, position_minimum, position_maximum ) );
-                        pcf_cloud->ComponentVector.push_back( new COMPONENT( "Z", COMPRESSION::Discretization, position_bit_count, position_precision, position_minimum, position_maximum ) );
-
-                        if ( point_has_i_field )
+                        if ( component_character == 'x'
+                             || component_character == 'X' )
                         {
-                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "I", COMPRESSION::Discretization, intensity_bit_count, intensity_precision, intensity_minimum, intensity_maximum ) );
+                            x_component_character = component_character;
+
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "X", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, minimum_x, maximum_x )
+                                );
                         }
-
-                        if ( point_has_rgb_fields )
+                        else if ( component_character == 'y'
+                                  || component_character == 'Y' )
                         {
-                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "R", COMPRESSION::Discretization, color_bit_count, color_precision, color_minimum, color_maximum ) );
-                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "G", COMPRESSION::Discretization, color_bit_count, color_precision, color_minimum, color_maximum ) );
-                            pcf_cloud->ComponentVector.push_back( new COMPONENT( "B", COMPRESSION::Discretization, color_bit_count, color_precision, color_minimum, color_maximum ) );
+                            y_component_character = component_character;
+
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "Y", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, minimum_y, maximum_y )
+                                );
+                        }
+                        else if ( component_character == 'z'
+                                  || component_character == 'Z' )
+                        {
+                            z_component_character = component_character;
+
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "Z", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, minimum_z, maximum_z )
+                                );
+                        }
+                        else if ( component_character == 'n' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "I", COMPRESSION::Discretization, 12, 1.0, -2048.0, -2048.0, 2047.0 )
+                                );
+                        }
+                        else if ( component_character == 'i' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "I", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                                );
+                        }
+                        else if ( component_character == 'I' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "I", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                                );
+                        }
+                        else if ( component_character == 'r' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "R", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                                );
+                        }
+                        else if ( component_character == 'R' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "R", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                                );
+                        }
+                        else if ( component_character == 'g' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "G", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                                );
+                        }
+                        else if ( component_character == 'G' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "G", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                                );
+                        }
+                        else if ( component_character == 'b' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "B", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                                );
+                        }
+                        else if ( component_character == 'B' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "B", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                                );
                         }
                     }
                 }
+
 
                 CompressedVectorReader
                     compressed_vector_reader
@@ -706,14 +1065,6 @@ struct E57_CLOUD
 
                 while ( ( point_count = compressed_vector_reader.read() ) > 0 )
                 {
-                    pcf_scan->Name = scan.Name;
-                    pcf_scan->PointCount = point_count;
-                    pcf_scan->ColumnCount = point_count;
-                    pcf_scan->RowCount = 1;
-                    pcf_scan->PositionVector = scan.PositionVector;
-                    pcf_scan->RotationVector = scan.RotationVector;
-                    pcf_scan->SetAxisVectors();
-
                     for ( point_index = 0;
                           point_index < point_count;
                           ++point_index )
@@ -724,35 +1075,42 @@ struct E57_CLOUD
 
                         if ( point_has_i_field )
                         {
-                            point.ColorVector.W = floor( ( point_i_array[ point_index ] - minimum_i ) * 255 / ( maximum_i - minimum_i ) );
+                            point.ColorVector.W = ( point_i_array[ point_index ] - minimum_i ) / ( maximum_i - minimum_i );
                         }
 
-                        if ( point_has_rgb_fields )
+                        if ( point_has_r_field )
                         {
-                            point.ColorVector.X = floor( ( point_r_array[ point_index ] - minimum_r ) * 255 / ( maximum_r - minimum_r ) );
-                            point.ColorVector.Y = floor( ( point_g_array[ point_index ] - minimum_g ) * 255 / ( maximum_g - minimum_g ) );
-                            point.ColorVector.Z = floor( ( point_b_array[ point_index ] - minimum_b ) * 255 / ( maximum_b - minimum_b ) );
+                            point.ColorVector.X = ( point_r_array[ point_index ] - minimum_r ) / ( maximum_r - minimum_r );
                         }
 
-                        point = point.GetTransformedPoint( Transform );
-
-                        pcf_cell = pcf_scan->GetCell( pcf_cloud->ComponentVector, point.PositionVector.X, point.PositionVector.Y, point.PositionVector.Z );
-                        pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, 0, point.PositionVector.X );
-                        pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, 1, point.PositionVector.Y );
-                        pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, 2, point.PositionVector.Z );
-                        component_index = 3;
-
-                        if ( point_has_i_field )
+                        if ( point_has_g_field )
                         {
-                            pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, component_index, point.ColorVector.W );
-                            ++component_index;
+                            point.ColorVector.Y = ( point_g_array[ point_index ] - minimum_g ) / ( maximum_g - minimum_g );
                         }
 
-                        if ( point_has_rgb_fields )
+                        if ( point_has_b_field )
                         {
-                            pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, component_index, point.ColorVector.X );
-                            pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, component_index + 1, point.ColorVector.Y );
-                            pcf_cell->AddComponentValue( pcf_cloud->ComponentVector, component_index + 2, point.ColorVector.Z );
+                            point.ColorVector.Z = ( point_b_array[ point_index ] - minimum_b ) / ( maximum_b - minimum_b );
+                        }
+
+                        TransformPoint( point );
+
+                        pcf_cell
+                            = pcf_scan->GetCell(
+                                  point.GetComponentValue( x_component_character ),
+                                  point.GetComponentValue( y_component_character ),
+                                  point.GetComponentValue( z_component_character )
+                                  );
+
+                        for ( component_index = 0;
+                              component_index < component_count;
+                              ++component_index )
+                        {
+                            pcf_cell->AddComponentValue(
+                                pcf_scan->ComponentVector,
+                                component_index,
+                                point.GetComponentValue( output_component_format[ component_index ] )
+                                );
                         }
 
                         ++( pcf_cell->PointCount );
@@ -765,23 +1123,16 @@ struct E57_CLOUD
 
         cout << "Writing file : " << output_file_path << "\n";
 
+        if ( IsVerbose )
+        {
+            pcf_cloud->Dump();
+        }
+
         pcf_cloud->WritePcfFile( output_file_path );
     }
 };
 
 // -- FUNCTIONS
-
-bool HasSuffix(
-    const string & text,
-    const string & suffix
-    )
-{
-    return
-        text.length() >= suffix.length()
-        && !text.compare( text.length() - suffix.length(), suffix.length(), suffix );
-}
-
-// ~~
 
 int main(
     int argument_count,
@@ -802,9 +1153,18 @@ int main(
                 && argument_array[ 0 ][ 0 ] == '-'
                 && argument_array[ 0 ][ 1 ] == '-' )
         {
-            if ( argument_count >= 4
-                 && !strcmp( argument_array[ 0 ], "--position-offset" ) )
+            if ( argument_count >= 1
+                 && !strcmp( argument_array[ 0 ], "--verbose" ) )
             {
+                cloud.IsVerbose = true;
+
+                argument_count -= 1;
+                argument_array += 1;
+            }
+            else if ( argument_count >= 4
+                      && !strcmp( argument_array[ 0 ], "--position-offset" ) )
+            {
+                cloud.HasTransform = true;
                 cloud.Transform.PositionOffsetVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.PositionOffsetVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.PositionOffsetVector.Z = stof( argument_array[ 3 ] );
@@ -815,6 +1175,7 @@ int main(
             else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--position-scaling" ) )
             {
+                cloud.HasTransform = true;
                 cloud.Transform.PositionScalingVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.PositionScalingVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.PositionScalingVector.Z = stof( argument_array[ 3 ] );
@@ -825,6 +1186,7 @@ int main(
             else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--position-rotation" ) )
             {
+                cloud.HasTransform = true;
                 cloud.Transform.PositionRotationVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.PositionRotationVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.PositionRotationVector.Z = stof( argument_array[ 3 ] );
@@ -835,6 +1197,7 @@ int main(
             else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--position-translation" ) )
             {
+                cloud.HasTransform = true;
                 cloud.Transform.PositionTranslationVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.PositionTranslationVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.PositionTranslationVector.Z = stof( argument_array[ 3 ] );
@@ -845,6 +1208,7 @@ int main(
             else if ( argument_count >= 5
                       && !strcmp( argument_array[ 0 ], "--color-offset" ) )
             {
+                cloud.HasTransform = true;
                 cloud.Transform.ColorOffsetVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.ColorOffsetVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.ColorOffsetVector.Z = stof( argument_array[ 3 ] );
@@ -856,6 +1220,7 @@ int main(
             else if ( argument_count >= 2
                       && !strcmp( argument_array[ 0 ], "--color-scaling" ) )
             {
+                cloud.HasTransform = true;
                 cloud.Transform.ColorScalingVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.ColorScalingVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.ColorScalingVector.Z = stof( argument_array[ 3 ] );
@@ -867,6 +1232,7 @@ int main(
             else if ( argument_count >= 2
                       && !strcmp( argument_array[ 0 ], "--color-translation" ) )
             {
+                cloud.HasTransform = true;
                 cloud.Transform.ColorTranslationVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.ColorTranslationVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.ColorTranslationVector.Z = stof( argument_array[ 3 ] );
@@ -894,7 +1260,7 @@ int main(
             else if ( argument_count >= 3
                       && !strcmp( argument_array[ 0 ], "--write-xyz-cloud" ) )
             {
-                cloud.WriteXyzOrPtsFile(
+                cloud.WriteXyzFile(
                     file_path,
                     argument_array[ 1 ],
                     argument_array[ 2 ],
@@ -907,7 +1273,7 @@ int main(
             else if ( argument_count >= 3
                       && !strcmp( argument_array[ 0 ], "--write-pts-cloud" ) )
             {
-                cloud.WriteXyzOrPtsFile(
+                cloud.WriteXyzFile(
                     file_path,
                     argument_array[ 1 ],
                     argument_array[ 2 ],
@@ -917,19 +1283,33 @@ int main(
                 argument_count -= 3;
                 argument_array += 3;
             }
-            else if ( argument_count >= 4
+            else if ( argument_count >= 3
+                      && !strcmp( argument_array[ 0 ], "--write-ptx-cloud" ) )
+            {
+                cloud.WriteXyzFile(
+                    file_path,
+                    argument_array[ 1 ],
+                    argument_array[ 2 ],
+                    "ptx"
+                    );
+
+                argument_count -= 3;
+                argument_array += 3;
+            }
+            else if ( argument_count >= 5
                       && !strcmp( argument_array[ 0 ], "--write-pcf-cloud" ) )
             {
                 cloud.WritePcfFile(
                     file_path,
                     argument_array[ 1 ],
-                    ( stol( argument_array[ 2 ] ) < 32 ) ? COMPRESSION::Discretization : COMPRESSION::None,
-                    ( uint16_t )stol( argument_array[ 2 ] ),
-                    stod( argument_array[ 3 ] )
+                    argument_array[ 2 ],
+                    ( stol( argument_array[ 3 ] ) < 32 ) ? COMPRESSION::Discretization : COMPRESSION::None,
+                    ( uint16_t )stol( argument_array[ 3 ] ),
+                    stod( argument_array[ 4 ] )
                     );
 
-                argument_count -= 4;
-                argument_array += 4;
+                argument_count -= 5;
+                argument_array += 5;
             }
             else
             {
@@ -966,6 +1346,7 @@ int main(
             << "Usage :\n"
             << "    nubea <options>\n"
             << "Options :\n"
+            << "    --verbose\n"
             << "    --position-offset <x> <y> <z>\n"
             << "    --position-scaling <x> <y> <z>\n"
             << "    --position-rotation <x> <y> <z>\n"
@@ -975,9 +1356,10 @@ int main(
             << "    --color-translation <r> <g> <b> <i>\n"
             << "    --decimation-count <decimation count>\n"
             << "    --read-e57-cloud <file path>\n"
-            << "    --write-xyz-cloud <file path> <line format>\n"
-            << "    --write-pts-cloud <file path> <line format>\n"
-            << "    --write-pcf-cloud <file path> <position bit count> <position precision>\n";
+            << "    --write-xyz-cloud <file path> <component format>\n"
+            << "    --write-pts-cloud <file path> <component format>\n"
+            << "    --write-ptx-cloud <file path> <component format>\n"
+            << "    --write-pcf-cloud <file path> <component format> <position bit count> <position precision>\n";
 
         return -1;
     }
