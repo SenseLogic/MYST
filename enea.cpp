@@ -1,21 +1,21 @@
 /*
-    This file is part of the Enubea distribution.
+    This file is part of the Enea distribution.
 
-    https://github.com/senselogic/ENUBEA
+    https://github.com/senselogic/ENEA
 
     Copyright (C) 2021 Eric Pelzer (ecstatic.coder@gmail.com)
 
-    Enubea is free software: you can redistribute it and/or modify
+    Enea is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, version 3.
 
-    Enubea is distributed in the hope that it will be useful,
+    Enea is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with Enubea.  If not, see <http://www.gnu.org/licenses/>.
+    along with Enea.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 // -- IMPORTS
@@ -67,6 +67,10 @@ struct TRANSFORM
 {
     // -- ATTRIBUTES
 
+    bool
+        SwapsXY,
+        SwapsXZ,
+        SwapsYZ;
     VECTOR_3
         PositionOffsetVector,
         PositionRotationVector,
@@ -82,16 +86,19 @@ struct TRANSFORM
     // -- CONSTRUCTORS
 
     TRANSFORM(
-        )
+        ) :
+        SwapsXY( false ),
+        SwapsXZ( false ),
+        SwapsYZ( false ),
+        PositionOffsetVector( 0.0, 0.0, 0.0 ),
+        PositionRotationVector( 0.0, 0.0, 0.0 ),
+        PositionScalingVector( 1.0, 1.0, 1.0 ),
+        PositionTranslationVector( 0.0, 0.0, 0.0 ),
+        ColorOffsetVector( 0.0, 0.0, 0.0, 0.0 ),
+        ColorScalingVector( 1.0, 1.0, 1.0, 1.0 ),
+        ColorTranslationVector( 0.0, 0.0, 0.0, 0.0 ),
+        DecimationCount( 1 )
     {
-        PositionOffsetVector.SetNull();
-        PositionRotationVector.SetNull();
-        PositionScalingVector.SetUnit();
-        PositionTranslationVector.SetNull();
-        ColorOffsetVector.SetNull();
-        ColorScalingVector.SetUnit();
-        ColorTranslationVector.SetNull();
-        DecimationCount = 1;
     }
 };
 
@@ -109,10 +116,10 @@ struct POINT
     // -- CONSTRUCTORS
 
     POINT(
-        )
+        ) :
+        PositionVector( 0.0, 0.0, 0.0 ),
+        ColorVector( 0.0, 0.0, 0.0, 0.0 )
     {
-        PositionVector.SetNull();
-        ColorVector.SetNull();
     }
 
     // -- OPERATORS
@@ -140,14 +147,12 @@ struct POINT
     // -- INQUIRIES
 
     void Dump(
+        string indentation = ""
         ) const
     {
         cout
-            << GetText( PositionVector.X )
-            << " "
-            << GetText( PositionVector.Y )
-            << " "
-            << GetText( PositionVector.Z )
+            << indentation
+            << GetText( PositionVector )
             << " "
             << GetText( ColorVector.W )
             << " "
@@ -242,7 +247,35 @@ struct POINT
         POINT
             transformed_point;
 
+
         transformed_point = *this;
+
+        if ( transform.SwapsXY )
+        {
+            transformed_point.PositionVector.SetVector(
+                transformed_point.PositionVector.Y,
+                transformed_point.PositionVector.X,
+                transformed_point.PositionVector.Z
+                );
+        }
+
+        if ( transform.SwapsXZ )
+        {
+            transformed_point.PositionVector.SetVector(
+                transformed_point.PositionVector.Z,
+                transformed_point.PositionVector.Y,
+                transformed_point.PositionVector.X
+                );
+        }
+
+        if ( transform.SwapsYZ )
+        {
+            transformed_point.PositionVector.SetVector(
+                transformed_point.PositionVector.X,
+                transformed_point.PositionVector.Z,
+                transformed_point.PositionVector.Y
+                );
+        }
 
         transformed_point.PositionVector.Translate(
             transform.PositionOffsetVector.X,
@@ -333,6 +366,37 @@ struct E57_SCAN
         MaximumPointCount;
     bool
         IsColumnIndex;
+
+    // -- CONSTRUCTORS
+
+    E57_SCAN(
+        ) :
+        Name(),
+        PositionVector(),
+        RotationVector(),
+        Data(),
+        RowCount( 0 ),
+        ColumnCount( 0 ),
+        PointCount( 0 ),
+        GroupCount( 0 ),
+        MaximumPointCount( 0 ),
+        IsColumnIndex( false )
+    {
+    }
+
+    // -- INQUIRIES
+
+    void Dump(
+        string indentation = ""
+        ) const
+    {
+        cout << indentation << "Name : " << Name << "\n";
+        cout << indentation << "PositionVector : " << GetText( PositionVector ) << "\n";
+        cout << indentation << "RotationVector : " << GetText( RotationVector ) << "\n";
+        cout << indentation << "RowCount : " << RowCount << "\n";
+        cout << indentation << "ColumnCount : " << ColumnCount << "\n";
+        cout << indentation << "PointCount : " << PointCount << "\n";
+    }
 };
 
 // ~~
@@ -342,6 +406,8 @@ struct E57_CLOUD
     // -- ATTRIBUTES
 
     bool
+        IsLeftHanded,
+        IsZUp,
         HasTransform,
         IsVerbose;
     TRANSFORM
@@ -353,6 +419,8 @@ struct E57_CLOUD
 
     E57_CLOUD(
         ) :
+        IsLeftHanded( false ),
+        IsZUp( false ),
         HasTransform( false ),
         IsVerbose( false ),
         Transform(),
@@ -551,6 +619,9 @@ struct E57_CLOUD
               ++scan_index )
         {
             scan = &ScanVector[ scan_index ];
+
+            cout << "Scan[" << scan_index << "] : \n";
+            scan->Dump( "    " );
 
             if ( output_file_format == "ptx" )
             {
@@ -828,6 +899,8 @@ struct E57_CLOUD
         cout << "Reading file : " << input_file_path << "\n";
 
         pcf_cloud = new pcf::CLOUD();
+        pcf_cloud->IsLeftHanded = IsLeftHanded;
+        pcf_cloud->IsZUp = IsZUp;
 
         Reader
             file_reader( input_file_path );
@@ -861,6 +934,9 @@ struct E57_CLOUD
                 scan.MaximumPointCount,
                 scan.IsColumnIndex
                 );
+
+            cout << "Scan[" << scan_index << "] : \n";
+            scan.Dump( "    " );
 
             point_has_x_field = scan.Data.pointFields.cartesianXField;
             point_has_y_field = scan.Data.pointFields.cartesianYField;
@@ -1161,6 +1237,49 @@ int main(
                 argument_count -= 1;
                 argument_array += 1;
             }
+            else if ( argument_count >= 1
+                      && !strcmp( argument_array[ 0 ], "--left-handed" ) )
+            {
+                cloud.IsLeftHanded = true;
+
+                argument_count -= 1;
+                argument_array += 1;
+            }
+            else if ( argument_count >= 1
+                      && !strcmp( argument_array[ 0 ], "--z-up" ) )
+            {
+                cloud.IsZUp = true;
+
+                argument_count -= 1;
+                argument_array += 1;
+            }
+            else if ( argument_count >= 1
+                      && !strcmp( argument_array[ 0 ], "--swap-xy" ) )
+            {
+                cloud.HasTransform = true;
+                cloud.Transform.SwapsXY = true;
+
+                argument_count -= 1;
+                argument_array += 1;
+            }
+            else if ( argument_count >= 1
+                      && !strcmp( argument_array[ 0 ], "--swap-xz" ) )
+            {
+                cloud.HasTransform = true;
+                cloud.Transform.SwapsXZ = true;
+
+                argument_count -= 1;
+                argument_array += 1;
+            }
+            else if ( argument_count >= 1
+                      && !strcmp( argument_array[ 0 ], "--swap-yz" ) )
+            {
+                cloud.HasTransform = true;
+                cloud.Transform.SwapsYZ = true;
+
+                argument_count -= 1;
+                argument_array += 1;
+            }
             else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--position-offset" ) )
             {
@@ -1344,7 +1463,7 @@ int main(
     {
         cerr
             << "Usage :\n"
-            << "    enubea <options>\n"
+            << "    enea <options>\n"
             << "Options :\n"
             << "    --verbose\n"
             << "    --position-offset <x> <y> <z>\n"

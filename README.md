@@ -1,19 +1,24 @@
-![](https://github.com/senselogic/ENUBEA/blob/master/LOGO/enubea.png)
+![](https://github.com/senselogic/ENEA/blob/master/LOGO/enea.png)
 
-# Enubea
+# Enea
 
 E57 point cloud converter.
 
 ## Command line
 
 ```bash
-enubea [options]
+enea [options]
 ```
 
 ### Options
 
 ```bash
 --verbose : show the processing messages
+--left-handed : set the left-handed property
+--z-up : set the Z-up property
+--swap-xy : swap the Y and Z position components
+--swap-xz : swap the Y and Z position components
+--swap-yz : swap the Y and Z position components
 --position-offset <x> <y> <z> : set the loading position offset
 --position-scaling <x> <y> <z> : set the loading position scaling
 --position-rotation <x> <y> <z> : set the loading position rotation
