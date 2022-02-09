@@ -1,13 +1,13 @@
-![](https://github.com/senselogic/ENEA/blob/master/LOGO/enea.png)
+![](https://github.com/senselogic/MYST/blob/master/LOGO/myst.png)
 
-# Enea
+# Myst
 
 E57 point cloud converter.
 
 ## Command line
 
 ```bash
-enea [options]
+myst [options]
 ```
 
 ### Options

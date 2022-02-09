@@ -1,21 +1,21 @@
 /*
-    This file is part of the Enea distribution.
+    This file is part of the Myst distribution.
 
-    https://github.com/senselogic/ENEA
+    https://github.com/senselogic/MYST
 
     Copyright (C) 2021 Eric Pelzer (ecstatic.coder@gmail.com)
 
-    Enea is free software: you can redistribute it and/or modify
+    Myst is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, version 3.
 
-    Enea is distributed in the hope that it will be useful,
+    Myst is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with Enea.  If not, see <http://www.gnu.org/licenses/>.
+    along with Myst.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 // -- IMPORTS
@@ -1553,7 +1553,7 @@ int main(
     {
         cerr
             << "Usage :\n"
-            << "    enea <options>\n"
+            << "    myst <options>\n"
             << "Options :\n"
             << "    --verbose\n"
             << "    --position-offset <x> <y> <z>\n"
