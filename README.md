@@ -14,6 +14,7 @@ enea [options]
 
 ```bash
 --verbose : show the processing messages
+--progress : show the processing progress
 --left-handed : set the left-handed property
 --z-up : set the Z-up property
 --swap-xy : swap the Y and Z position components
@@ -72,9 +73,9 @@ B : blue (from 0 to 255)
 
 ## Dependencies
 
-*   [PCF](https://github.com/senselogic/PCF/tree/master/CODE/CPP)
 *   [Boost 1.76.0](https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.7z)
 *   [Xerces 3.2.3](https://downloads.apache.org/xerces/c/3/sources/xerces-c-3.2.3.zip)
+*   [PCF](https://github.com/senselogic/PCF/tree/master/CODE/CPP)
 
 ## Version
 

@@ -4,4 +4,4 @@ rm -r BUILD
 mkdir BUILD
 cd BUILD
 cmake ../LINUX
-cmake --build . --config Release
+cmake --build .

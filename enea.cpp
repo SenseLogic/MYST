@@ -61,6 +61,23 @@ using pcf::SCAN;
 using pcf::VECTOR_3;
 using pcf::VECTOR_4;
 
+// -- VARIABLES
+
+const int64_t
+    MaximumPointCount = 65536;
+static double
+    PointDArray[ MaximumPointCount ],
+    PointAArray[ MaximumPointCount ],
+    PointEArray[ MaximumPointCount ],
+    PointXArray[ MaximumPointCount ],
+    PointYArray[ MaximumPointCount ],
+    PointZArray[ MaximumPointCount ],
+    PointIArray[ MaximumPointCount ];
+static uint16_t
+    PointBArray[ MaximumPointCount ],
+    PointGArray[ MaximumPointCount ],
+    PointRArray[ MaximumPointCount ];
+
 // -- TYPES
 
 struct TRANSFORM
@@ -109,6 +126,7 @@ struct POINT
     // -- ATTRIBUTES
 
     VECTOR_3
+        SphericalPositionVector,
         PositionVector;
     VECTOR_4
         ColorVector;
@@ -117,6 +135,7 @@ struct POINT
 
     POINT(
         ) :
+        SphericalPositionVector( 0.0, 0.0, 0.0 ),
         PositionVector( 0.0, 0.0, 0.0 ),
         ColorVector( 0.0, 0.0, 0.0, 0.0 )
     {
@@ -129,7 +148,8 @@ struct POINT
         ) const
     {
         return
-            PositionVector == point.PositionVector
+            SphericalPositionVector == point.SphericalPositionVector
+            && PositionVector == point.PositionVector
             && ColorVector == point.ColorVector;
     }
 
@@ -140,7 +160,8 @@ struct POINT
         ) const
     {
         return
-            PositionVector != point.PositionVector
+            SphericalPositionVector != point.SphericalPositionVector
+            || PositionVector != point.PositionVector
             || ColorVector != point.ColorVector;
     }
 
@@ -152,6 +173,8 @@ struct POINT
     {
         cout
             << indentation
+            << GetText( SphericalPositionVector )
+            << " "
             << GetText( PositionVector )
             << " "
             << GetText( ColorVector.W )
@@ -170,7 +193,19 @@ struct POINT
         char component_character
         )
     {
-        if ( component_character == 'x' )
+        if ( component_character == 'D' )
+        {
+            return SphericalPositionVector.X;
+        }
+        else if ( component_character == 'A' )
+        {
+            return SphericalPositionVector.Y;
+        }
+        else if ( component_character == 'E' )
+        {
+            return SphericalPositionVector.Z;
+        }
+        else if ( component_character == 'x' )
         {
             return -PositionVector.X;
         }
@@ -365,7 +400,38 @@ struct E57_SCAN
         GroupCount,
         MaximumPointCount;
     bool
-        IsColumnIndex;
+        IsColumnIndex,
+        HasDComponent,
+        HasAComponent,
+        HasEComponent,
+        HasXComponent,
+        HasYComponent,
+        HasZComponent,
+        HasIComponent,
+        HasRComponent,
+        HasGComponent,
+        HasBComponent;
+    double
+        MinimumD,
+        MaximumD,
+        MinimumA,
+        MaximumA,
+        MinimumE,
+        MaximumE,
+        MinimumX,
+        MaximumX,
+        MinimumY,
+        MaximumY,
+        MinimumZ,
+        MaximumZ,
+        MinimumI,
+        MaximumI,
+        MinimumR,
+        MaximumR,
+        MinimumG,
+        MaximumG,
+        MinimumB,
+        MaximumB;
 
     // -- CONSTRUCTORS
 
@@ -380,7 +446,37 @@ struct E57_SCAN
         PointCount( 0 ),
         GroupCount( 0 ),
         MaximumPointCount( 0 ),
-        IsColumnIndex( false )
+        IsColumnIndex( false ),
+        HasDComponent( false ),
+        HasAComponent( false ),
+        HasEComponent( false ),
+        HasXComponent( false ),
+        HasYComponent( false ),
+        HasZComponent( false ),
+        HasIComponent( false ),
+        HasRComponent( false ),
+        HasGComponent( false ),
+        HasBComponent( false ),
+        MinimumD( 0.0 ),
+        MaximumD( 0.0 ),
+        MinimumA( 0.0 ),
+        MaximumA( 0.0 ),
+        MinimumE( 0.0 ),
+        MaximumE( 0.0 ),
+        MinimumX( 0.0 ),
+        MaximumX( 0.0 ),
+        MinimumY( 0.0 ),
+        MaximumY( 0.0 ),
+        MinimumZ( 0.0 ),
+        MaximumZ( 0.0 ),
+        MinimumI( 0.0 ),
+        MaximumI( 0.0 ),
+        MinimumR( 0.0 ),
+        MaximumR( 0.0 ),
+        MinimumG( 0.0 ),
+        MaximumG( 0.0 ),
+        MinimumB( 0.0 ),
+        MaximumB( 0.0 )
     {
     }
 
@@ -396,6 +492,192 @@ struct E57_SCAN
         cout << indentation << "RowCount : " << RowCount << "\n";
         cout << indentation << "ColumnCount : " << ColumnCount << "\n";
         cout << indentation << "PointCount : " << PointCount << "\n";
+
+        if ( HasDComponent )
+        {
+            cout << indentation << "D : " << GetText( MinimumD ) << " / " << GetText( MaximumD ) << "\n";
+        }
+
+        if ( HasAComponent )
+        {
+            cout << indentation << "A : " << GetText( MinimumA ) << " / " << GetText( MaximumA ) << "\n";
+        }
+
+        if ( HasEComponent )
+        {
+            cout << indentation << "E : " << GetText( MinimumE ) << " / " << GetText( MaximumE ) << "\n";
+        }
+
+        if ( HasXComponent )
+        {
+            cout << indentation << "X : " << GetText( MinimumX ) << " / " << GetText( MaximumX ) << "\n";
+        }
+
+        if ( HasYComponent )
+        {
+            cout << indentation << "Y : " << GetText( MinimumY ) << " / " << GetText( MaximumY ) << "\n";
+        }
+
+        if ( HasZComponent )
+        {
+            cout << indentation << "Z : " << GetText( MinimumZ ) << " / " << GetText( MaximumZ ) << "\n";
+        }
+
+        if ( HasIComponent )
+        {
+            cout << indentation << "I : " << GetText( MinimumI ) << " / " << GetText( MaximumI ) << "\n";
+        }
+
+        if ( HasRComponent )
+        {
+            cout << indentation << "R : " << GetText( MinimumR ) << " / " << GetText( MaximumR ) << "\n";
+        }
+
+        if ( HasGComponent )
+        {
+            cout << indentation << "G : " << GetText( MinimumG ) << " / " << GetText( MaximumG ) << "\n";
+        }
+
+        if ( HasBComponent )
+        {
+            cout << indentation << "B : " << GetText( MinimumB ) << " / " << GetText( MaximumB ) << "\n";
+        }
+    }
+
+    // -- OPERATIONS
+
+    void ReadData(
+        Reader & reader,
+        int32_t scan_index
+        )
+    {
+        reader.ReadData3D(
+            scan_index,
+            Data
+            );
+
+        reader.GetData3DSizes(
+            scan_index,
+            RowCount,
+            ColumnCount,
+            PointCount,
+            GroupCount,
+            MaximumPointCount,
+            IsColumnIndex
+            );
+
+        Name = Data.name;
+        PositionVector.X = Data.pose.translation.x;
+        PositionVector.Y = Data.pose.translation.y;
+        PositionVector.Z = Data.pose.translation.z;
+        RotationVector.X = Data.pose.rotation.x;
+        RotationVector.Y = Data.pose.rotation.y;
+        RotationVector.Z = Data.pose.rotation.z;
+        RotationVector.W = Data.pose.rotation.w;
+
+        HasDComponent = Data.pointFields.sphericalRangeField;
+        HasAComponent = Data.pointFields.sphericalAzimuthField;
+        HasEComponent = Data.pointFields.sphericalElevationField;
+        HasXComponent = Data.pointFields.cartesianXField;
+        HasYComponent = Data.pointFields.cartesianYField;
+        HasZComponent = Data.pointFields.cartesianZField;
+        HasIComponent = Data.pointFields.intensityField;
+        HasRComponent = Data.pointFields.colorRedField;
+        HasGComponent = Data.pointFields.colorGreenField;
+        HasBComponent = Data.pointFields.colorBlueField;
+
+        MinimumD = Data.sphericalBounds.rangeMinimum;
+        MaximumD = Data.sphericalBounds.rangeMaximum;
+        MinimumA = Data.sphericalBounds.azimuthStart;
+        MaximumA = Data.sphericalBounds.azimuthEnd;
+        MinimumE = Data.sphericalBounds.elevationMinimum;
+        MaximumE = Data.sphericalBounds.elevationMaximum;
+        MinimumX = Data.cartesianBounds.xMinimum;
+        MaximumX = Data.cartesianBounds.xMaximum;
+        MinimumY = Data.cartesianBounds.yMinimum;
+        MaximumY = Data.cartesianBounds.yMaximum;
+        MinimumZ = Data.cartesianBounds.zMinimum;
+        MaximumZ = Data.cartesianBounds.zMaximum;
+        MinimumI = Data.intensityLimits.intensityMinimum;
+        MaximumI = Data.intensityLimits.intensityMaximum;
+        MinimumR = Data.colorLimits.colorRedMinimum;
+        MaximumR = Data.colorLimits.colorRedMaximum;
+        MinimumG = Data.colorLimits.colorGreenMinimum;
+        MaximumG = Data.colorLimits.colorGreenMaximum;
+        MinimumB = Data.colorLimits.colorBlueMinimum;
+        MaximumB = Data.colorLimits.colorBlueMaximum;
+    }
+
+    // ~~
+
+    void SetPoint(
+        POINT & point,
+        int64_t point_index
+        )
+    {
+        if ( HasDComponent )
+        {
+            point.SphericalPositionVector.X = PointDArray[ point_index ];
+        }
+
+        if ( HasAComponent )
+        {
+            point.SphericalPositionVector.Y = PointAArray[ point_index ];
+        }
+
+        if ( HasEComponent )
+        {
+            point.SphericalPositionVector.Z = PointEArray[ point_index ];
+        }
+
+        if ( HasXComponent )
+        {
+            point.PositionVector.X = PointXArray[ point_index ];
+        }
+
+        if ( HasYComponent )
+        {
+            point.PositionVector.Y = PointYArray[ point_index ];
+        }
+
+        if ( HasZComponent )
+        {
+            point.PositionVector.Z = PointZArray[ point_index ];
+        }
+
+        if ( HasDComponent
+             && HasAComponent
+             && HasEComponent
+             && !HasXComponent
+             && !HasYComponent
+             && !HasZComponent )
+        {
+            point.PositionVector.SetZUpCartesianVector(
+                point.SphericalPositionVector.X,
+                point.SphericalPositionVector.Y,
+                point.SphericalPositionVector.Z
+                );
+        }
+
+        if ( HasIComponent )
+        {
+            point.ColorVector.W = ( PointIArray[ point_index ] - MinimumI ) / ( MaximumI - MinimumI );
+        }
+
+        if ( HasRComponent )
+        {
+            point.ColorVector.X = ( PointRArray[ point_index ] - MinimumR ) / ( MaximumR - MinimumR );
+        }
+
+        if ( HasGComponent )
+        {
+            point.ColorVector.Y = ( PointGArray[ point_index ] - MinimumG ) / ( MaximumG - MinimumG );
+        }
+
+        if ( HasBComponent )
+        {
+            point.ColorVector.Z = ( PointBArray[ point_index ] - MinimumB ) / ( MaximumB - MinimumB );
+        }
     }
 };
 
@@ -406,10 +688,10 @@ struct E57_CLOUD
     // -- ATTRIBUTES
 
     bool
+        IsVerbose,
         IsLeftHanded,
         IsZUp,
-        HasTransform,
-        IsVerbose;
+        HasTransform;
     TRANSFORM
         Transform;
     vector<E57_SCAN>
@@ -419,10 +701,10 @@ struct E57_CLOUD
 
     E57_CLOUD(
         ) :
+        IsVerbose( false ),
         IsLeftHanded( false ),
         IsZUp( false ),
         HasTransform( false ),
-        IsVerbose( false ),
         Transform(),
         ScanVector()
     {
@@ -434,7 +716,19 @@ struct E57_CLOUD
         char component_character
         )
     {
-        if ( component_character == 'x'
+        if ( component_character == 'D' )
+        {
+            return "X";
+        }
+        else if ( component_character == 'A' )
+        {
+            return "A";
+        }
+        else if ( component_character == 'E' )
+        {
+            return "E";
+        }
+        else if ( component_character == 'x'
              || component_character == 'X' )
         {
             return "X";
@@ -478,7 +772,35 @@ struct E57_CLOUD
         }
     }
 
-    // -- OPERATIONS
+    // ~~
+
+    void PrintProgress(
+        uint64_t point_index,
+        uint64_t point_count
+        )
+    {
+        uint64_t
+            point_count_divider;
+
+        if ( point_index + 1 == point_count )
+        {
+            cout << "\r   \r";
+        }
+        else
+        {
+            point_count_divider = point_count / 100;
+
+            if ( point_count_divider > 0 )
+            {
+                if ( point_index % point_count_divider == 0 )
+                {
+                    cout << "\r" << ( point_index / point_count_divider ) << "%";
+                }
+            }
+        }
+    }
+
+    // ~~
 
     void TransformPoint(
         POINT & point
@@ -501,7 +823,7 @@ struct E57_CLOUD
         }
     }
 
-    // ~~
+    // -- OPERATIONS
 
     void WriteXyzFile(
         const string & input_file_path,
@@ -510,40 +832,6 @@ struct E57_CLOUD
         const string & output_file_format
         )
     {
-        const int64_t
-            MaximumPointCount = 65536;
-        static double
-            point_i_array[ MaximumPointCount ],
-            point_x_array[ MaximumPointCount ],
-            point_y_array[ MaximumPointCount ],
-            point_z_array[ MaximumPointCount ];
-        static uint16_t
-            point_b_array[ MaximumPointCount ],
-            point_g_array[ MaximumPointCount ],
-            point_r_array[ MaximumPointCount ];
-        bool
-            point_has_b_field,
-            point_has_g_field,
-            point_has_i_field,
-            point_has_r_field,
-            point_has_x_field,
-            point_has_y_field,
-            point_has_z_field;
-        double
-            minimum_b,
-            maximum_b,
-            minimum_g,
-            maximum_g,
-            minimum_i,
-            maximum_i,
-            minimum_r,
-            maximum_r,
-            minimum_x,
-            maximum_x,
-            minimum_y,
-            maximum_y,
-            minimum_z,
-            maximum_z;
         int32_t
             scan_count,
             scan_index;
@@ -552,7 +840,8 @@ struct E57_CLOUD
             point_index;
         uint64_t
             component_count,
-            component_index;
+            component_index,
+            scan_point_index;
         ofstream
             output_file_stream;
         POINT
@@ -569,10 +858,12 @@ struct E57_CLOUD
         cout << "Reading file : " << input_file_path << "\n";
 
         Reader
-            file_reader( input_file_path );
+            reader( input_file_path );
 
-        scan_count = file_reader.GetData3DCount();
+        scan_count = reader.GetData3DCount();
         ScanVector.resize( scan_count );
+
+        cout << "ScanCount : " << scan_count << "\n";
 
         point_count = 0;
 
@@ -581,26 +872,7 @@ struct E57_CLOUD
               ++scan_index )
         {
             scan = &ScanVector[ scan_index ];
-            file_reader.ReadData3D( scan_index, scan->Data );
-
-            scan->Name = scan->Data.name;
-            scan->PositionVector.X = scan->Data.pose.translation.x;
-            scan->PositionVector.Y = scan->Data.pose.translation.y;
-            scan->PositionVector.Z = scan->Data.pose.translation.z;
-            scan->RotationVector.X = scan->Data.pose.rotation.x;
-            scan->RotationVector.Y = scan->Data.pose.rotation.y;
-            scan->RotationVector.Z = scan->Data.pose.rotation.z;
-            scan->RotationVector.W = scan->Data.pose.rotation.w;
-
-            file_reader.GetData3DSizes(
-                scan_index,
-                scan->RowCount,
-                scan->ColumnCount,
-                scan->PointCount,
-                scan->GroupCount,
-                scan->MaximumPointCount,
-                scan->IsColumnIndex
-                );
+            scan->ReadData( reader, scan_index );
 
             point_count += scan->PointCount;
         }
@@ -686,121 +958,60 @@ struct E57_CLOUD
                     << " 1\n";
             }
 
-            point_has_x_field = scan->Data.pointFields.cartesianXField;
-            point_has_y_field = scan->Data.pointFields.cartesianYField;
-            point_has_z_field = scan->Data.pointFields.cartesianZField;
-            point_has_i_field = scan->Data.pointFields.intensityField;
-            point_has_r_field = scan->Data.pointFields.colorRedField;
-            point_has_g_field = scan->Data.pointFields.colorGreenField;
-            point_has_b_field = scan->Data.pointFields.colorBlueField;
+            CompressedVectorReader
+                compressed_vector_reader
+                    = reader.SetUpData3DPointsData(
+                          scan_index,
+                          MaximumPointCount,
+                          PointXArray,
+                          PointYArray,
+                          PointZArray,
+                          nullptr,
+                          PointIArray,
+                          nullptr,
+                          PointRArray,
+                          PointGArray,
+                          PointBArray,
+                          nullptr,
+                          PointDArray,
+                          PointAArray,
+                          PointEArray,
+                          nullptr,
+                          nullptr
+                          );
 
-            minimum_x = scan->Data.cartesianBounds.xMinimum;
-            maximum_x = scan->Data.cartesianBounds.xMaximum;
-            minimum_y = scan->Data.cartesianBounds.yMinimum;
-            maximum_y = scan->Data.cartesianBounds.yMaximum;
-            minimum_z = scan->Data.cartesianBounds.zMinimum;
-            maximum_z = scan->Data.cartesianBounds.zMaximum;
-            minimum_i = scan->Data.intensityLimits.intensityMinimum;
-            maximum_i = scan->Data.intensityLimits.intensityMaximum;
-            minimum_r = scan->Data.colorLimits.colorRedMinimum;
-            maximum_r = scan->Data.colorLimits.colorRedMaximum;
-            minimum_g = scan->Data.colorLimits.colorGreenMinimum;
-            maximum_g = scan->Data.colorLimits.colorGreenMaximum;
-            minimum_b = scan->Data.colorLimits.colorBlueMinimum;
-            maximum_b = scan->Data.colorLimits.colorBlueMaximum;
+            scan_point_index = 0;
 
-            if ( IsVerbose )
+            while ( ( point_count = compressed_vector_reader.read() ) > 0 )
             {
-                if ( point_has_x_field )
+                for ( point_index = 0;
+                      point_index < point_count;
+                      ++point_index )
                 {
-                    cout << "X : " << GetText( minimum_x ) << " / " << GetText( maximum_x ) << "\n";
-                }
-
-                if ( point_has_y_field )
-                {
-                    cout << "Y : " << GetText( minimum_y ) << " / " << GetText( maximum_y ) << "\n";
-                }
-
-                if ( point_has_z_field )
-                {
-                    cout << "Z : " << GetText( minimum_z ) << " / " << GetText( maximum_z ) << "\n";
-                }
-
-                if ( point_has_i_field )
-                {
-                    cout << "I : " << GetText( minimum_i ) << " / " << GetText( maximum_i ) << "\n";
-                }
-
-                if ( point_has_r_field )
-                {
-                    cout << "R : " << GetText( minimum_r ) << " / " << GetText( maximum_r ) << "\n";
-                }
-
-                if ( point_has_g_field )
-                {
-                    cout << "G : " << GetText( minimum_g ) << " / " << GetText( maximum_g ) << "\n";
-                }
-
-                if ( point_has_b_field )
-                {
-                    cout << "B : " << GetText( minimum_b ) << " / " << GetText( maximum_b ) << "\n";
-                }
-            }
-
-            if ( point_has_x_field
-                 && point_has_y_field
-                 && point_has_z_field )
-            {
-                CompressedVectorReader
-                    compressed_vector_reader
-                        = file_reader.SetUpData3DPointsData(
-                            scan_index,
-                            MaximumPointCount,
-                            point_x_array,
-                            point_y_array,
-                            point_z_array,
-                            nullptr,
-                            point_i_array,
-                            nullptr,
-                            point_r_array,
-                            point_g_array,
-                            point_b_array,
-                            nullptr,
-                            nullptr,
-                            nullptr,
-                            nullptr,
-                            nullptr,
-                            nullptr
-                            );
-
-                while ( ( point_count = compressed_vector_reader.read() ) > 0 )
-                {
-                    for ( point_index = 0;
-                          point_index < point_count;
-                          ++point_index )
+                    if ( scan_point_index % Transform.DecimationCount == 0 )
                     {
-                        point.PositionVector.X = point_x_array[ point_index ];
-                        point.PositionVector.Y = point_y_array[ point_index ];
-                        point.PositionVector.Z = point_z_array[ point_index ];
+                        point.PositionVector.X = PointXArray[ point_index ];
+                        point.PositionVector.Y = PointYArray[ point_index ];
+                        point.PositionVector.Z = PointZArray[ point_index ];
 
-                        if ( point_has_r_field )
+                        if ( scan->HasRComponent )
                         {
-                            point.ColorVector.X = ( point_r_array[ point_index ] - minimum_r ) / ( maximum_r - minimum_r );
+                            point.ColorVector.X = ( PointRArray[ point_index ] - scan->MinimumR ) / ( scan->MaximumR - scan->MinimumR );
                         }
 
-                        if ( point_has_g_field )
+                        if ( scan->HasGComponent )
                         {
-                            point.ColorVector.Y = ( point_g_array[ point_index ] - minimum_g ) / ( maximum_g - minimum_g );
+                            point.ColorVector.Y = ( PointGArray[ point_index ] - scan->MinimumG ) / ( scan->MaximumG - scan->MinimumG );
                         }
 
-                        if ( point_has_b_field )
+                        if ( scan->HasBComponent )
                         {
-                            point.ColorVector.Z = ( point_b_array[ point_index ] - minimum_b ) / ( maximum_b - minimum_b );
+                            point.ColorVector.Z = ( PointBArray[ point_index ] - scan->MinimumB ) / ( scan->MaximumB - scan->MinimumB );
                         }
 
-                        if ( point_has_i_field )
+                        if ( scan->HasIComponent )
                         {
-                            point.ColorVector.W = ( point_i_array[ point_index ] - minimum_i ) / ( maximum_i - minimum_i );
+                            point.ColorVector.W = ( PointIArray[ point_index ] - scan->MinimumI ) / ( scan->MaximumI - scan->MinimumI );
                         }
 
                         TransformPoint( point );
@@ -819,6 +1030,13 @@ struct E57_CLOUD
 
                         output_file_stream << "\n";
                     }
+
+                    if ( !IsVerbose )
+                    {
+                        PrintProgress( scan_point_index, scan->PointCount );
+                    }
+
+                    ++scan_point_index;
                 }
             }
         }
@@ -837,45 +1055,11 @@ struct E57_CLOUD
         const double position_precision
         )
     {
-        const int64_t
-            MaximumPointCount = 65536;
-        static double
-            point_i_array[ MaximumPointCount ],
-            point_x_array[ MaximumPointCount ],
-            point_y_array[ MaximumPointCount ],
-            point_z_array[ MaximumPointCount ];
-        static uint16_t
-            point_b_array[ MaximumPointCount ],
-            point_g_array[ MaximumPointCount ],
-            point_r_array[ MaximumPointCount ];
-        bool
-            point_has_b_field,
-            point_has_g_field,
-            point_has_i_field,
-            point_has_r_field,
-            point_has_x_field,
-            point_has_y_field,
-            point_has_z_field;
         char
             component_character,
             x_component_character,
             y_component_character,
             z_component_character;
-        double
-            minimum_b,
-            maximum_b,
-            minimum_g,
-            maximum_g,
-            minimum_i,
-            maximum_i,
-            minimum_r,
-            maximum_r,
-            minimum_x,
-            maximum_x,
-            minimum_y,
-            maximum_y,
-            minimum_z,
-            maximum_z;
         int32_t
             scan_count,
             scan_index;
@@ -884,7 +1068,8 @@ struct E57_CLOUD
             point_index;
         uint64_t
             component_count,
-            component_index;
+            component_index,
+            scan_point_index;
         LINK_<pcf::SCAN>
             pcf_scan;
         LINK_<pcf::CLOUD>
@@ -903,272 +1088,170 @@ struct E57_CLOUD
         pcf_cloud->IsZUp = IsZUp;
 
         Reader
-            file_reader( input_file_path );
+            reader( input_file_path );
 
         component_count = output_component_format.size();
 
-        scan_count = file_reader.GetData3DCount();
+        scan_count = reader.GetData3DCount();
         ScanVector.resize( scan_count );
+
+        cout << "ScanCount : " << scan_count << "\n";
 
         for ( scan_index = 0;
               scan_index < scan_count;
               ++scan_index )
         {
-            file_reader.ReadData3D( scan_index, scan.Data );
-
-            scan.Name = scan.Data.name;
-            scan.PositionVector.X = scan.Data.pose.translation.x;
-            scan.PositionVector.Y = scan.Data.pose.translation.y;
-            scan.PositionVector.Z = scan.Data.pose.translation.z;
-            scan.RotationVector.X = scan.Data.pose.rotation.x;
-            scan.RotationVector.Y = scan.Data.pose.rotation.y;
-            scan.RotationVector.Z = scan.Data.pose.rotation.z;
-            scan.RotationVector.W = scan.Data.pose.rotation.w;
-
-            file_reader.GetData3DSizes(
-                scan_index,
-                scan.RowCount,
-                scan.ColumnCount,
-                scan.PointCount,
-                scan.GroupCount,
-                scan.MaximumPointCount,
-                scan.IsColumnIndex
-                );
+            scan.ReadData( reader, scan_index );
 
             cout << "Scan[" << scan_index << "] : \n";
             scan.Dump( "    " );
 
-            point_has_x_field = scan.Data.pointFields.cartesianXField;
-            point_has_y_field = scan.Data.pointFields.cartesianYField;
-            point_has_z_field = scan.Data.pointFields.cartesianZField;
-            point_has_i_field = scan.Data.pointFields.intensityField;
-            point_has_r_field = scan.Data.pointFields.colorRedField;
-            point_has_g_field = scan.Data.pointFields.colorGreenField;
-            point_has_b_field = scan.Data.pointFields.colorBlueField;
+            pcf_scan = new SCAN();
+            pcf_scan->Name = scan.Name;
+            pcf_scan->PointCount = scan.PointCount;
+            pcf_scan->ColumnCount = scan.ColumnCount;
+            pcf_scan->RowCount = scan.RowCount;
+            pcf_scan->PositionVector = scan.PositionVector;
+            pcf_scan->RotationVector = scan.RotationVector;
+            pcf_scan->SetAxisVectors();
 
-            minimum_x = scan.Data.cartesianBounds.xMinimum;
-            maximum_x = scan.Data.cartesianBounds.xMaximum;
-            minimum_y = scan.Data.cartesianBounds.yMinimum;
-            maximum_y = scan.Data.cartesianBounds.yMaximum;
-            minimum_z = scan.Data.cartesianBounds.zMinimum;
-            maximum_z = scan.Data.cartesianBounds.zMaximum;
-            minimum_i = scan.Data.intensityLimits.intensityMinimum;
-            maximum_i = scan.Data.intensityLimits.intensityMaximum;
-            minimum_r = scan.Data.colorLimits.colorRedMinimum;
-            maximum_r = scan.Data.colorLimits.colorRedMaximum;
-            minimum_g = scan.Data.colorLimits.colorGreenMinimum;
-            maximum_g = scan.Data.colorLimits.colorGreenMaximum;
-            minimum_b = scan.Data.colorLimits.colorBlueMinimum;
-            maximum_b = scan.Data.colorLimits.colorBlueMaximum;
+            x_component_character = 'X';
+            y_component_character = 'Y';
+            z_component_character = 'Z';
 
-            if ( IsVerbose )
+            for ( component_index = 0;
+                  component_index < component_count;
+                  ++component_index )
             {
-                if ( point_has_x_field )
-                {
-                    cout << "X : " << GetText( minimum_x ) << " / " << GetText( maximum_x ) << "\n";
-                }
+                component_character = output_component_format[ component_index ];
 
-                if ( point_has_y_field )
+                if ( compression == COMPRESSION::None )
                 {
-                    cout << "Y : " << GetText( minimum_y ) << " / " << GetText( maximum_y ) << "\n";
+                    pcf_scan->ComponentVector.push_back(
+                        new COMPONENT( GetComponentName( component_character ), COMPRESSION::None, 32, 0.0, 0.0, 0.0 )
+                        );
                 }
-
-                if ( point_has_z_field )
+                else
                 {
-                    cout << "Z : " << GetText( minimum_z ) << " / " << GetText( maximum_z ) << "\n";
-                }
+                    assert( compression == COMPRESSION::Discretization );
 
-                if ( point_has_i_field )
-                {
-                    cout << "I : " << GetText( minimum_i ) << " / " << GetText( maximum_i ) << "\n";
-                }
+                    if ( component_character == 'x'
+                         || component_character == 'X' )
+                    {
+                        x_component_character = component_character;
 
-                if ( point_has_r_field )
-                {
-                    cout << "R : " << GetText( minimum_r ) << " / " << GetText( maximum_r ) << "\n";
-                }
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "X", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, scan.MinimumX, scan.MaximumX )
+                            );
+                    }
+                    else if ( component_character == 'y'
+                              || component_character == 'Y' )
+                    {
+                        y_component_character = component_character;
 
-                if ( point_has_g_field )
-                {
-                    cout << "G : " << GetText( minimum_g ) << " / " << GetText( maximum_g ) << "\n";
-                }
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "Y", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, scan.MinimumY, scan.MaximumY )
+                            );
+                    }
+                    else if ( component_character == 'z'
+                              || component_character == 'Z' )
+                    {
+                        z_component_character = component_character;
 
-                if ( point_has_b_field )
-                {
-                    cout << "B : " << GetText( minimum_b ) << " / " << GetText( maximum_b ) << "\n";
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "Z", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, scan.MinimumZ, scan.MaximumZ )
+                            );
+                    }
+                    else if ( component_character == 'n' )
+                    {
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "I", COMPRESSION::Discretization, 12, 1.0, -2048.0, -2048.0, 2047.0 )
+                            );
+                    }
+                    else if ( component_character == 'i' )
+                    {
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "I", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                            );
+                    }
+                    else if ( component_character == 'I' )
+                    {
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "I", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                            );
+                    }
+                    else if ( component_character == 'r' )
+                    {
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "R", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                            );
+                    }
+                    else if ( component_character == 'R' )
+                    {
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "R", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                            );
+                    }
+                    else if ( component_character == 'g' )
+                    {
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "G", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                            );
+                    }
+                    else if ( component_character == 'G' )
+                    {
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "G", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                            );
+                    }
+                    else if ( component_character == 'b' )
+                    {
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "B", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                            );
+                    }
+                    else if ( component_character == 'B' )
+                    {
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( "B", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                            );
+                    }
                 }
             }
 
-            if ( point_has_x_field
-                 && point_has_y_field
-                 && point_has_z_field )
+            CompressedVectorReader
+                compressed_vector_reader
+                    = reader.SetUpData3DPointsData(
+                          scan_index,
+                          MaximumPointCount,
+                          PointXArray,
+                          PointYArray,
+                          PointZArray,
+                          nullptr,
+                          PointIArray,
+                          nullptr,
+                          PointRArray,
+                          PointGArray,
+                          PointBArray,
+                          nullptr,
+                          PointDArray,
+                          PointAArray,
+                          PointEArray,
+                          nullptr,
+                          nullptr
+                          );
+
+            scan_point_index = 0;
+
+            while ( ( point_count = compressed_vector_reader.read() ) > 0 )
             {
-                pcf_scan = new SCAN();
-                pcf_scan->Name = scan.Name;
-                pcf_scan->PointCount = scan.PointCount;
-                pcf_scan->ColumnCount = scan.ColumnCount;
-                pcf_scan->RowCount = scan.RowCount;
-                pcf_scan->PositionVector = scan.PositionVector;
-                pcf_scan->RotationVector = scan.RotationVector;
-                pcf_scan->SetAxisVectors();
-
-                x_component_character = 'X';
-                y_component_character = 'Y';
-                z_component_character = 'Z';
-
-                for ( component_index = 0;
-                      component_index < component_count;
-                      ++component_index )
+                for ( point_index = 0;
+                      point_index < point_count;
+                      ++point_index )
                 {
-                    component_character = output_component_format[ component_index ];
-
-                    if ( compression == COMPRESSION::None )
+                    if ( scan_point_index % Transform.DecimationCount == 0 )
                     {
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( GetComponentName( component_character ), COMPRESSION::None, 32, 0.0, 0.0, 0.0 )
-                            );
-                    }
-                    else
-                    {
-                        assert( compression == COMPRESSION::Discretization );
-
-                        if ( component_character == 'x'
-                             || component_character == 'X' )
-                        {
-                            x_component_character = component_character;
-
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "X", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, minimum_x, maximum_x )
-                                );
-                        }
-                        else if ( component_character == 'y'
-                                  || component_character == 'Y' )
-                        {
-                            y_component_character = component_character;
-
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "Y", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, minimum_y, maximum_y )
-                                );
-                        }
-                        else if ( component_character == 'z'
-                                  || component_character == 'Z' )
-                        {
-                            z_component_character = component_character;
-
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "Z", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, minimum_z, maximum_z )
-                                );
-                        }
-                        else if ( component_character == 'n' )
-                        {
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "I", COMPRESSION::Discretization, 12, 1.0, -2048.0, -2048.0, 2047.0 )
-                                );
-                        }
-                        else if ( component_character == 'i' )
-                        {
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "I", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
-                                );
-                        }
-                        else if ( component_character == 'I' )
-                        {
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "I", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
-                                );
-                        }
-                        else if ( component_character == 'r' )
-                        {
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "R", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
-                                );
-                        }
-                        else if ( component_character == 'R' )
-                        {
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "R", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
-                                );
-                        }
-                        else if ( component_character == 'g' )
-                        {
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "G", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
-                                );
-                        }
-                        else if ( component_character == 'G' )
-                        {
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "G", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
-                                );
-                        }
-                        else if ( component_character == 'b' )
-                        {
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "B", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
-                                );
-                        }
-                        else if ( component_character == 'B' )
-                        {
-                            pcf_scan->ComponentVector.push_back(
-                                new COMPONENT( "B", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
-                                );
-                        }
-                    }
-                }
-
-
-                CompressedVectorReader
-                    compressed_vector_reader
-                        = file_reader.SetUpData3DPointsData(
-                            scan_index,
-                            MaximumPointCount,
-                            point_x_array,
-                            point_y_array,
-                            point_z_array,
-                            nullptr,
-                            point_i_array,
-                            nullptr,
-                            point_r_array,
-                            point_g_array,
-                            point_b_array,
-                            nullptr,
-                            nullptr,
-                            nullptr,
-                            nullptr,
-                            nullptr,
-                            nullptr
-                            );
-
-                while ( ( point_count = compressed_vector_reader.read() ) > 0 )
-                {
-                    for ( point_index = 0;
-                          point_index < point_count;
-                          ++point_index )
-                    {
-                        point.PositionVector.X = point_x_array[ point_index ];
-                        point.PositionVector.Y = point_y_array[ point_index ];
-                        point.PositionVector.Z = point_z_array[ point_index ];
-
-                        if ( point_has_i_field )
-                        {
-                            point.ColorVector.W = ( point_i_array[ point_index ] - minimum_i ) / ( maximum_i - minimum_i );
-                        }
-
-                        if ( point_has_r_field )
-                        {
-                            point.ColorVector.X = ( point_r_array[ point_index ] - minimum_r ) / ( maximum_r - minimum_r );
-                        }
-
-                        if ( point_has_g_field )
-                        {
-                            point.ColorVector.Y = ( point_g_array[ point_index ] - minimum_g ) / ( maximum_g - minimum_g );
-                        }
-
-                        if ( point_has_b_field )
-                        {
-                            point.ColorVector.Z = ( point_b_array[ point_index ] - minimum_b ) / ( maximum_b - minimum_b );
-                        }
-
+                        scan.SetPoint( point, point_index );
                         TransformPoint( point );
 
                         pcf_cell
@@ -1191,10 +1274,17 @@ struct E57_CLOUD
 
                         ++( pcf_cell->PointCount );
                     }
-                }
 
-                pcf_cloud->ScanVector.push_back( pcf_scan );
+                    if ( !IsVerbose )
+                    {
+                        PrintProgress( scan_point_index, scan.PointCount );
+                    }
+
+                    ++scan_point_index;
+                }
             }
+
+            pcf_cloud->ScanVector.push_back( pcf_scan );
         }
 
         cout << "Writing file : " << output_file_path << "\n";
