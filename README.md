@@ -81,6 +81,10 @@ B : blue (from 0 to 255)
 
 0.3
 
+## Limitations
+
+* Spherical point positions are converted to cartesian coordinates.
+
 ## Author
 
 Eric Pelzer (ecstatic.coder@gmail.com).
