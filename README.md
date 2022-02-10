@@ -27,7 +27,9 @@ myst [options]
 --color-offset <r> <g> <b> <i> : set the loading color offset
 --color-scaling <r> <g> <b> <i> : set the loading color scaling
 --color-translation <r> <g> <b> <i> : set the loading color translation
---decimation-count <decimation count> : set the loading decimation count
+--scan-count <maximum scan count>
+--point-count <maximum scan point count>
+--decimation <decimation count>
 --read-e57-cloud <file path> : read an E57 point cloud
 --write-xyz-cloud <file path> <component format> : write an XYZ point cloud
 --write-pts-cloud <file path> <component format> : write a PTS point cloud

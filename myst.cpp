@@ -64,19 +64,19 @@ using pcf::VECTOR_4;
 // -- VARIABLES
 
 const int64_t
-    MaximumPointCount = 65536;
+    BufferPointCount = 65536;
 static double
-    PointDArray[ MaximumPointCount ],
-    PointAArray[ MaximumPointCount ],
-    PointEArray[ MaximumPointCount ],
-    PointXArray[ MaximumPointCount ],
-    PointYArray[ MaximumPointCount ],
-    PointZArray[ MaximumPointCount ],
-    PointIArray[ MaximumPointCount ];
+    PointDArray[ BufferPointCount ],
+    PointAArray[ BufferPointCount ],
+    PointEArray[ BufferPointCount ],
+    PointXArray[ BufferPointCount ],
+    PointYArray[ BufferPointCount ],
+    PointZArray[ BufferPointCount ],
+    PointIArray[ BufferPointCount ];
 static uint16_t
-    PointBArray[ MaximumPointCount ],
-    PointGArray[ MaximumPointCount ],
-    PointRArray[ MaximumPointCount ];
+    PointBArray[ BufferPointCount ],
+    PointGArray[ BufferPointCount ],
+    PointRArray[ BufferPointCount ];
 
 // -- TYPES
 
@@ -97,8 +97,6 @@ struct TRANSFORM
         ColorOffsetVector,
         ColorScalingVector,
         ColorTranslationVector;
-    int64_t
-        DecimationCount;
 
     // -- CONSTRUCTORS
 
@@ -113,8 +111,7 @@ struct TRANSFORM
         PositionTranslationVector( 0.0, 0.0, 0.0 ),
         ColorOffsetVector( 0.0, 0.0, 0.0, 0.0 ),
         ColorScalingVector( 1.0, 1.0, 1.0, 1.0 ),
-        ColorTranslationVector( 0.0, 0.0, 0.0, 0.0 ),
-        DecimationCount( 1 )
+        ColorTranslationVector( 0.0, 0.0, 0.0, 0.0 )
     {
     }
 };
@@ -231,7 +228,7 @@ struct POINT
         }
         else if ( component_character == 'n' )
         {
-            return -2048 + ColorVector.W * 4095;
+            return floor( -2048.0 + ColorVector.W * 4095.0 );
         }
         else if ( component_character == 'i' )
         {
@@ -239,7 +236,7 @@ struct POINT
         }
         else if ( component_character == 'I' )
         {
-            return ColorVector.W * 255.0;
+            return floor( ColorVector.W * 255.0 );
         }
         else if ( component_character == 'r' )
         {
@@ -247,7 +244,7 @@ struct POINT
         }
         else if ( component_character == 'R' )
         {
-            return ColorVector.X * 255.0;
+            return floor( ColorVector.X * 255.0 );
         }
         else if ( component_character == 'g' )
         {
@@ -255,7 +252,7 @@ struct POINT
         }
         else if ( component_character == 'G' )
         {
-            return ColorVector.Y * 255.0;
+            return floor( ColorVector.Y * 255.0 );
         }
         else if ( component_character == 'b' )
         {
@@ -263,7 +260,7 @@ struct POINT
         }
         else if ( component_character == 'B' )
         {
-            return ColorVector.Z * 255.0;
+            return floor( ColorVector.Z * 255.0 );
         }
         else
         {
@@ -391,6 +388,11 @@ struct E57_SCAN
         PositionVector;
     VECTOR_4
         RotationVector;
+    VECTOR_3
+        XAxisVector,
+        YAxisVector,
+        ZAxisVector,
+        ScalingVector;
     Data3D
         Data;
     int64_t
@@ -398,7 +400,7 @@ struct E57_SCAN
         ColumnCount,
         PointCount,
         GroupCount,
-        MaximumPointCount;
+        BufferPointCount;
     bool
         IsColumnIndex,
         HasDComponent,
@@ -440,12 +442,16 @@ struct E57_SCAN
         Name(),
         PositionVector(),
         RotationVector(),
+        XAxisVector(),
+        YAxisVector(),
+        ZAxisVector(),
+        ScalingVector( 1.0, 1.0, 1.0 ),
         Data(),
         RowCount( 0 ),
         ColumnCount( 0 ),
         PointCount( 0 ),
         GroupCount( 0 ),
-        MaximumPointCount( 0 ),
+        BufferPointCount( 0 ),
         IsColumnIndex( false ),
         HasDComponent( false ),
         HasAComponent( false ),
@@ -489,6 +495,9 @@ struct E57_SCAN
         cout << indentation << "Name : " << Name << "\n";
         cout << indentation << "PositionVector : " << GetText( PositionVector ) << "\n";
         cout << indentation << "RotationVector : " << GetText( RotationVector ) << "\n";
+        cout << indentation << "XAxisVector : " << GetText( XAxisVector ) << "\n";
+        cout << indentation << "YAxisVector : " << GetText( YAxisVector ) << "\n";
+        cout << indentation << "ZAxisVector : " << GetText( ZAxisVector ) << "\n";
         cout << indentation << "RowCount : " << RowCount << "\n";
         cout << indentation << "ColumnCount : " << ColumnCount << "\n";
         cout << indentation << "PointCount : " << PointCount << "\n";
@@ -562,9 +571,21 @@ struct E57_SCAN
             ColumnCount,
             PointCount,
             GroupCount,
-            MaximumPointCount,
+            BufferPointCount,
             IsColumnIndex
             );
+
+        if ( RowCount == 0
+             && ColumnCount == 0
+             && PointCount > 0 )
+        {
+            RowCount = 1;
+            ColumnCount = PointCount;
+        }
+        else if ( RowCount * ColumnCount != PointCount )
+        {
+            cerr << "*** WARNING : Invalid point count " << PointCount << " (" << RowCount << "/" << ColumnCount << ")\n";
+        }
 
         Name = Data.name;
         PositionVector.X = Data.pose.translation.x;
@@ -574,6 +595,7 @@ struct E57_SCAN
         RotationVector.Y = Data.pose.rotation.y;
         RotationVector.Z = Data.pose.rotation.z;
         RotationVector.W = Data.pose.rotation.w;
+        RotationVector.GetAxisVectors( XAxisVector, YAxisVector, ZAxisVector );
 
         HasDComponent = Data.pointFields.sphericalRangeField;
         HasAComponent = Data.pointFields.sphericalAzimuthField;
@@ -612,7 +634,8 @@ struct E57_SCAN
 
     void SetPoint(
         POINT & point,
-        int64_t point_index
+        int64_t point_index,
+        bool point_is_transformed
         )
     {
         if ( HasDComponent )
@@ -645,20 +668,6 @@ struct E57_SCAN
             point.PositionVector.Z = PointZArray[ point_index ];
         }
 
-        if ( HasDComponent
-             && HasAComponent
-             && HasEComponent
-             && !HasXComponent
-             && !HasYComponent
-             && !HasZComponent )
-        {
-            point.PositionVector.SetZUpCartesianVector(
-                point.SphericalPositionVector.X,
-                point.SphericalPositionVector.Y,
-                point.SphericalPositionVector.Z
-                );
-        }
-
         if ( HasIComponent )
         {
             point.ColorVector.W = ( PointIArray[ point_index ] - MinimumI ) / ( MaximumI - MinimumI );
@@ -678,6 +687,32 @@ struct E57_SCAN
         {
             point.ColorVector.Z = ( PointBArray[ point_index ] - MinimumB ) / ( MaximumB - MinimumB );
         }
+
+        if ( HasDComponent
+             && HasAComponent
+             && HasEComponent
+             && !HasXComponent
+             && !HasYComponent
+             && !HasZComponent )
+        {
+            point.PositionVector.SetFromSphericalPosition(
+                point.SphericalPositionVector.X,
+                point.SphericalPositionVector.Y,
+                point.SphericalPositionVector.Z,
+                true
+                );
+        }
+
+        if ( point_is_transformed )
+        {
+            point.PositionVector.Transform(
+                PositionVector,
+                XAxisVector,
+                YAxisVector,
+                ZAxisVector,
+                ScalingVector
+                );
+        }
     }
 };
 
@@ -689,24 +724,31 @@ struct E57_CLOUD
 
     bool
         IsVerbose,
-        IsLeftHanded,
-        IsZUp,
+        XIsRight,
+        ZIsUp,
         HasTransform;
     TRANSFORM
         Transform;
     vector<E57_SCAN>
         ScanVector;
+    int64_t
+        MaximumScanCount,
+        MaximumScanPointCount,
+        DecimationCount;
 
     // -- CONSTRUCTORS
 
     E57_CLOUD(
         ) :
         IsVerbose( false ),
-        IsLeftHanded( false ),
-        IsZUp( false ),
+        XIsRight( false ),
+        ZIsUp( false ),
         HasTransform( false ),
         Transform(),
-        ScanVector()
+        ScanVector(),
+        MaximumScanCount( 9223372036854775807L ),
+        MaximumScanPointCount( 9223372036854775807L ),
+        DecimationCount( 1 )
     {
     }
 
@@ -784,7 +826,7 @@ struct E57_CLOUD
 
         if ( point_index + 1 == point_count )
         {
-            cout << "\r   \r";
+            cout << "    \r";
         }
         else
         {
@@ -794,7 +836,7 @@ struct E57_CLOUD
             {
                 if ( point_index % point_count_divider == 0 )
                 {
-                    cout << "\r" << ( point_index / point_count_divider ) << "%";
+                    cout << ( point_index / point_count_divider ) << "%\r";
                 }
             }
         }
@@ -823,6 +865,25 @@ struct E57_CLOUD
         }
     }
 
+    // ~~
+
+    int64_t GetScanPointCount(
+        const E57_SCAN & e57_scan
+        )
+    {
+        int64_t
+            scan_point_count;
+
+        scan_point_count = e57_scan.PointCount;
+
+        if ( scan_point_count > MaximumScanPointCount )
+        {
+            scan_point_count = MaximumScanPointCount;
+        }
+
+        return scan_point_count / DecimationCount;
+    }
+
     // -- OPERATIONS
 
     void WriteXyzFile(
@@ -832,26 +893,25 @@ struct E57_CLOUD
         const string & output_file_format
         )
     {
+        bool
+            point_is_transformed;
         int32_t
             scan_count,
             scan_index;
         int64_t
             point_count,
-            point_index;
+            point_index,
+            scan_point_count,
+            scan_point_index;
         uint64_t
             component_count,
-            component_index,
-            scan_point_index;
+            component_index;
         ofstream
             output_file_stream;
         POINT
             point;
         E57_SCAN
             * scan;
-        VECTOR_3
-            x_axis_vector,
-            y_axis_vector,
-            z_axis_vector;
 
         component_count = output_component_format.size();
 
@@ -868,13 +928,14 @@ struct E57_CLOUD
         point_count = 0;
 
         for ( scan_index = 0;
-              scan_index < scan_count;
+              scan_index < scan_count
+              && scan_index < MaximumScanCount;
               ++scan_index )
         {
             scan = &ScanVector[ scan_index ];
             scan->ReadData( reader, scan_index );
 
-            point_count += scan->PointCount;
+            point_count += GetScanPointCount( *scan );
         }
 
         cout << "Writing file : " << output_file_path << "\n";
@@ -887,7 +948,8 @@ struct E57_CLOUD
         }
 
         for ( scan_index = 0;
-              scan_index < scan_count;
+              scan_index < scan_count
+              && scan_index < MaximumScanCount;
               ++scan_index )
         {
             scan = &ScanVector[ scan_index ];
@@ -897,11 +959,13 @@ struct E57_CLOUD
 
             if ( output_file_format == "ptx" )
             {
-                scan->RotationVector.GetAxisVectors(
-                    x_axis_vector,
-                    y_axis_vector,
-                    z_axis_vector
-                    );
+                scan_point_count = GetScanPointCount( *scan );
+
+                if ( scan_point_count < scan->ColumnCount * scan->RowCount )
+                {
+                    scan->RowCount = 1;
+                    scan->ColumnCount = scan_point_count;
+                }
 
                 output_file_stream
                     << scan->ColumnCount
@@ -914,41 +978,41 @@ struct E57_CLOUD
                     << " "
                     << scan->PositionVector.Z
                     << "\n"
-                    << x_axis_vector.X
+                    << scan->XAxisVector.X
                     << " "
-                    << x_axis_vector.Y
+                    << scan->XAxisVector.Y
                     << " "
-                    << x_axis_vector.Z
+                    << scan->XAxisVector.Z
                     << "\n"
-                    << y_axis_vector.X
+                    << scan->YAxisVector.X
                     << " "
-                    << y_axis_vector.Y
+                    << scan->YAxisVector.Y
                     << " "
-                    << y_axis_vector.Z
+                    << scan->YAxisVector.Z
                     << "\n"
-                    << z_axis_vector.X
+                    << scan->ZAxisVector.X
                     << " "
-                    << z_axis_vector.Y
+                    << scan->ZAxisVector.Y
                     << " "
-                    << z_axis_vector.Z
+                    << scan->ZAxisVector.Z
                     << "\n"
-                    << x_axis_vector.X
+                    << scan->XAxisVector.X
                     << " "
-                    << x_axis_vector.Y
+                    << scan->XAxisVector.Y
                     << " "
-                    << x_axis_vector.Z
+                    << scan->XAxisVector.Z
                     << " 0\n"
-                    << y_axis_vector.X
+                    << scan->YAxisVector.X
                     << " "
-                    << y_axis_vector.Y
+                    << scan->YAxisVector.Y
                     << " "
-                    << y_axis_vector.Z
+                    << scan->YAxisVector.Z
                     << " 0\n"
-                    << z_axis_vector.X
+                    << scan->ZAxisVector.X
                     << " "
-                    << z_axis_vector.Y
+                    << scan->ZAxisVector.Y
                     << " "
-                    << z_axis_vector.Z
+                    << scan->ZAxisVector.Z
                     << " 0\n"
                     << scan->PositionVector.X
                     << " "
@@ -956,13 +1020,19 @@ struct E57_CLOUD
                     << " "
                     << scan->PositionVector.Z
                     << " 1\n";
+
+                point_is_transformed = false;
+            }
+            else
+            {
+                point_is_transformed = true;
             }
 
             CompressedVectorReader
                 compressed_vector_reader
                     = reader.SetUpData3DPointsData(
                           scan_index,
-                          MaximumPointCount,
+                          BufferPointCount,
                           PointXArray,
                           PointYArray,
                           PointZArray,
@@ -976,44 +1046,22 @@ struct E57_CLOUD
                           PointDArray,
                           PointAArray,
                           PointEArray,
-                          nullptr,
                           nullptr
                           );
 
             scan_point_index = 0;
 
-            while ( ( point_count = compressed_vector_reader.read() ) > 0 )
+            while ( scan_point_index < MaximumScanPointCount
+                    && ( point_count = compressed_vector_reader.read() ) > 0 )
             {
                 for ( point_index = 0;
                       point_index < point_count;
                       ++point_index )
                 {
-                    if ( scan_point_index % Transform.DecimationCount == 0 )
+                    if ( scan_point_index < MaximumScanPointCount
+                         && scan_point_index % DecimationCount == 0 )
                     {
-                        point.PositionVector.X = PointXArray[ point_index ];
-                        point.PositionVector.Y = PointYArray[ point_index ];
-                        point.PositionVector.Z = PointZArray[ point_index ];
-
-                        if ( scan->HasRComponent )
-                        {
-                            point.ColorVector.X = ( PointRArray[ point_index ] - scan->MinimumR ) / ( scan->MaximumR - scan->MinimumR );
-                        }
-
-                        if ( scan->HasGComponent )
-                        {
-                            point.ColorVector.Y = ( PointGArray[ point_index ] - scan->MinimumG ) / ( scan->MaximumG - scan->MinimumG );
-                        }
-
-                        if ( scan->HasBComponent )
-                        {
-                            point.ColorVector.Z = ( PointBArray[ point_index ] - scan->MinimumB ) / ( scan->MaximumB - scan->MinimumB );
-                        }
-
-                        if ( scan->HasIComponent )
-                        {
-                            point.ColorVector.W = ( PointIArray[ point_index ] - scan->MinimumI ) / ( scan->MaximumI - scan->MinimumI );
-                        }
-
+                        scan->SetPoint( point, point_index, point_is_transformed );
                         TransformPoint( point );
 
                         for ( component_index = 0;
@@ -1038,6 +1086,11 @@ struct E57_CLOUD
 
                     ++scan_point_index;
                 }
+            }
+
+            if ( scan_point_index != scan->PointCount )
+            {
+                cerr << "*** WARNING : " << scan_point_index << " points (" << scan->PointCount << ")\n";
             }
         }
 
@@ -1065,11 +1118,11 @@ struct E57_CLOUD
             scan_index;
         int64_t
             point_count,
-            point_index;
+            point_index,
+            scan_point_index;
         uint64_t
             component_count,
-            component_index,
-            scan_point_index;
+            component_index;
         LINK_<pcf::SCAN>
             pcf_scan;
         LINK_<pcf::CLOUD>
@@ -1084,8 +1137,8 @@ struct E57_CLOUD
         cout << "Reading file : " << input_file_path << "\n";
 
         pcf_cloud = new pcf::CLOUD();
-        pcf_cloud->IsLeftHanded = IsLeftHanded;
-        pcf_cloud->IsZUp = IsZUp;
+        pcf_cloud->XIsRight = XIsRight;
+        pcf_cloud->ZIsUp = ZIsUp;
 
         Reader
             reader( input_file_path );
@@ -1098,7 +1151,8 @@ struct E57_CLOUD
         cout << "ScanCount : " << scan_count << "\n";
 
         for ( scan_index = 0;
-              scan_index < scan_count;
+              scan_index < scan_count
+              && scan_count < MaximumScanCount;
               ++scan_index )
         {
             scan.ReadData( reader, scan_index );
@@ -1108,7 +1162,7 @@ struct E57_CLOUD
 
             pcf_scan = new SCAN();
             pcf_scan->Name = scan.Name;
-            pcf_scan->PointCount = scan.PointCount;
+            pcf_scan->PointCount = GetScanPointCount( scan );
             pcf_scan->ColumnCount = scan.ColumnCount;
             pcf_scan->RowCount = scan.RowCount;
             pcf_scan->PositionVector = scan.PositionVector;
@@ -1223,7 +1277,7 @@ struct E57_CLOUD
                 compressed_vector_reader
                     = reader.SetUpData3DPointsData(
                           scan_index,
-                          MaximumPointCount,
+                          BufferPointCount,
                           PointXArray,
                           PointYArray,
                           PointZArray,
@@ -1237,21 +1291,22 @@ struct E57_CLOUD
                           PointDArray,
                           PointAArray,
                           PointEArray,
-                          nullptr,
                           nullptr
                           );
 
             scan_point_index = 0;
 
-            while ( ( point_count = compressed_vector_reader.read() ) > 0 )
+            while ( scan_point_index < MaximumScanPointCount
+                    && ( point_count = compressed_vector_reader.read() ) > 0 )
             {
                 for ( point_index = 0;
                       point_index < point_count;
                       ++point_index )
                 {
-                    if ( scan_point_index % Transform.DecimationCount == 0 )
+                    if ( scan_point_index < MaximumScanPointCount
+                         && scan_point_index % DecimationCount == 0 )
                     {
-                        scan.SetPoint( point, point_index );
+                        scan.SetPoint( point, point_index, false );
                         TransformPoint( point );
 
                         pcf_cell
@@ -1282,6 +1337,11 @@ struct E57_CLOUD
 
                     ++scan_point_index;
                 }
+            }
+
+            if ( scan_point_index != scan.PointCount )
+            {
+                cerr << "*** WARNING : " << scan_point_index << " points (" << scan.PointCount << ")\n";
             }
 
             pcf_cloud->ScanVector.push_back( pcf_scan );
@@ -1330,7 +1390,7 @@ int main(
             else if ( argument_count >= 1
                       && !strcmp( argument_array[ 0 ], "--left-handed" ) )
             {
-                cloud.IsLeftHanded = true;
+                cloud.XIsRight = true;
 
                 argument_count -= 1;
                 argument_array += 1;
@@ -1338,7 +1398,7 @@ int main(
             else if ( argument_count >= 1
                       && !strcmp( argument_array[ 0 ], "--z-up" ) )
             {
-                cloud.IsZUp = true;
+                cloud.ZIsUp = true;
 
                 argument_count -= 1;
                 argument_array += 1;
@@ -1451,9 +1511,25 @@ int main(
                 argument_array += 5;
             }
             else if ( argument_count >= 2
-                      && !strcmp( argument_array[ 0 ], "--decimation-count" ) )
+                      && !strcmp( argument_array[ 0 ], "--scan-count" ) )
             {
-                cloud.Transform.DecimationCount = stoi( argument_array[ 1 ] );
+                cloud.MaximumScanCount = stoi( argument_array[ 1 ] );
+
+                argument_count -= 2;
+                argument_array += 2;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--point-count" ) )
+            {
+                cloud.MaximumScanPointCount = stoi( argument_array[ 1 ] );
+
+                argument_count -= 2;
+                argument_array += 2;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--decimation" ) )
+            {
+                cloud.DecimationCount = stoi( argument_array[ 1 ] );
 
                 argument_count -= 2;
                 argument_array += 2;
@@ -1528,21 +1604,16 @@ int main(
     }
     catch( E57Exception & exception_ )
     {
-        cerr
-            << "Error :\n";
-
+        cerr << "*** ERROR : ";
         exception_.report( __FILE__, __LINE__, __FUNCTION__ );
     }
     catch ( std::exception & exception_ )
     {
-        cerr
-            << "Error :\n"
-            << exception_.what() << "\n";
+        cerr << "*** ERROR : " << exception_.what() << "\n";
     }
     catch ( ... )
     {
-        cerr
-            << "Error.\n";
+        cerr << "*** ERROR\n";
     }
 
     if ( argument_count == 0 )
@@ -1556,6 +1627,11 @@ int main(
             << "    myst <options>\n"
             << "Options :\n"
             << "    --verbose\n"
+            << "    --left-handed\n"
+            << "    --z-up\n"
+            << "    --swap-xy\n"
+            << "    --swap-xz\n"
+            << "    --swap-yz\n"
             << "    --position-offset <x> <y> <z>\n"
             << "    --position-scaling <x> <y> <z>\n"
             << "    --position-rotation <x> <y> <z>\n"
@@ -1563,7 +1639,9 @@ int main(
             << "    --color-offset <r> <g> <b> <i>\n"
             << "    --color-scaling <r> <g> <b> <i>\n"
             << "    --color-translation <r> <g> <b> <i>\n"
-            << "    --decimation-count <decimation count>\n"
+            << "    --scan-count <maximum scan count>\n"
+            << "    --point-count <maximum scan point count>\n"
+            << "    --decimation <decimation count>\n"
             << "    --read-e57-cloud <file path>\n"
             << "    --write-xyz-cloud <file path> <component format>\n"
             << "    --write-pts-cloud <file path> <component format>\n"
