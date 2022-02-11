@@ -37,7 +37,7 @@ myst [options]
 --write-pcf-cloud <file path> <component format> <position bit count> <position precision> : write a PCF point cloud
 ```
 
-### Point format
+### Component format
 
 ```
 x : -X
