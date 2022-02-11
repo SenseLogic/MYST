@@ -15,7 +15,7 @@ myst [options]
 ```bash
 --verbose : show the processing messages
 --progress : show the processing progress
---axes <axis format> : set the axes
+--axes <axis format> : set the left, up and forward axis names
 --swap-xy : swap the Y and Z position components
 --swap-xz : swap the Y and Z position components
 --swap-yz : swap the Y and Z position components
