@@ -584,7 +584,7 @@ struct E57_SCAN
         }
         else if ( RowCount * ColumnCount != PointCount )
         {
-            cerr << "*** WARNING : Invalid point count " << PointCount << " (" << RowCount << "/" << ColumnCount << ")\n";
+            cerr << "*** WARNING : " << PointCount << " points (" << ( RowCount * ColumnCount ) << ")\n";
         }
 
         Name = Data.name;
@@ -705,7 +705,7 @@ struct E57_SCAN
 
         if ( point_is_transformed )
         {
-            point.PositionVector.Transform(
+            point.PositionVector.ApplyTranslationRotationScalingTransform(
                 PositionVector,
                 XAxisVector,
                 YAxisVector,
@@ -722,10 +722,9 @@ struct E57_CLOUD
 {
     // -- ATTRIBUTES
 
+    string
+        Axes;
     bool
-        IsVerbose,
-        XIsRight,
-        ZIsUp,
         HasTransform;
     TRANSFORM
         Transform;
@@ -735,20 +734,21 @@ struct E57_CLOUD
         MaximumScanCount,
         MaximumScanPointCount,
         DecimationCount;
+    bool
+        IsVerbose;
 
     // -- CONSTRUCTORS
 
     E57_CLOUD(
         ) :
-        IsVerbose( false ),
-        XIsRight( false ),
-        ZIsUp( false ),
+        Axes( "XYZ" ),
         HasTransform( false ),
         Transform(),
         ScanVector(),
         MaximumScanCount( 9223372036854775807L ),
         MaximumScanPointCount( 9223372036854775807L ),
-        DecimationCount( 1 )
+        DecimationCount( 1 ),
+        IsVerbose( false )
     {
     }
 
@@ -1137,8 +1137,7 @@ struct E57_CLOUD
         cout << "Reading file : " << input_file_path << "\n";
 
         pcf_cloud = new pcf::CLOUD();
-        pcf_cloud->XIsRight = XIsRight;
-        pcf_cloud->ZIsUp = ZIsUp;
+        pcf_cloud->SetAxes( Axes );
 
         Reader
             reader( input_file_path );
@@ -1387,21 +1386,14 @@ int main(
                 argument_count -= 1;
                 argument_array += 1;
             }
-            else if ( argument_count >= 1
-                      && !strcmp( argument_array[ 0 ], "--left-handed" ) )
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--axes" )
+                      && strlen( argument_array[ 1 ] ) == 3 )
             {
-                cloud.XIsRight = true;
+                cloud.Axes = argument_array[ 1 ];
 
-                argument_count -= 1;
-                argument_array += 1;
-            }
-            else if ( argument_count >= 1
-                      && !strcmp( argument_array[ 0 ], "--z-up" ) )
-            {
-                cloud.ZIsUp = true;
-
-                argument_count -= 1;
-                argument_array += 1;
+                argument_count -= 2;
+                argument_array += 2;
             }
             else if ( argument_count >= 1
                       && !strcmp( argument_array[ 0 ], "--swap-xy" ) )
@@ -1627,8 +1619,7 @@ int main(
             << "    myst <options>\n"
             << "Options :\n"
             << "    --verbose\n"
-            << "    --left-handed\n"
-            << "    --z-up\n"
+            << "    --axes <axes>\n"
             << "    --swap-xy\n"
             << "    --swap-xz\n"
             << "    --swap-yz\n"
