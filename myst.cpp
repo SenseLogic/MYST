@@ -1619,7 +1619,7 @@ int main(
             << "    myst <options>\n"
             << "Options :\n"
             << "    --verbose\n"
-            << "    --axes <axes>\n"
+            << "    --axes <axis format>\n"
             << "    --swap-xy\n"
             << "    --swap-xz\n"
             << "    --swap-yz\n"
