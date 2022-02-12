@@ -15,7 +15,7 @@ myst [options]
 ```bash
 --verbose : show the processing messages
 --progress : show the processing progress
---axes <axis format> : set the left, up and forward axis names
+--axis-format <component format> : set the left, up and forward component names
 --swap-xy : swap the Y and Z position components
 --swap-xz : swap the Y and Z position components
 --swap-yz : swap the Y and Z position components
@@ -34,17 +34,6 @@ myst [options]
 --write-pts-cloud <file path> <component format> : write a PTS point cloud
 --write-ptx-cloud <file path> <component format> : write a PTX point cloud
 --write-pcf-cloud <file path> <component format> <position bit count> <position precision> : write a PCF point cloud
-```
-
-### Axis format
-
-```
-x : -X
-X : +X
-y : -Y
-Y : +Y
-z : -Z
-Z : +Z
 ```
 
 ### Component format

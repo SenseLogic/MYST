@@ -723,7 +723,7 @@ struct E57_CLOUD
     // -- ATTRIBUTES
 
     string
-        Axes;
+        AxisFormat;
     bool
         HasTransform;
     TRANSFORM
@@ -741,7 +741,7 @@ struct E57_CLOUD
 
     E57_CLOUD(
         ) :
-        Axes( "XYZ" ),
+        AxisFormat( "XYZ" ),
         HasTransform( false ),
         Transform(),
         ScanVector(),
@@ -1137,7 +1137,7 @@ struct E57_CLOUD
         cout << "Reading file : " << input_file_path << "\n";
 
         pcf_cloud = new pcf::CLOUD();
-        pcf_cloud->SetAxes( Axes );
+        pcf_cloud->SetAxisFormat( AxisFormat );
 
         Reader
             reader( input_file_path );
@@ -1387,10 +1387,10 @@ int main(
                 argument_array += 1;
             }
             else if ( argument_count >= 2
-                      && !strcmp( argument_array[ 0 ], "--axes" )
+                      && !strcmp( argument_array[ 0 ], "--axis-format" )
                       && strlen( argument_array[ 1 ] ) == 3 )
             {
-                cloud.Axes = argument_array[ 1 ];
+                cloud.AxisFormat = argument_array[ 1 ];
 
                 argument_count -= 2;
                 argument_array += 2;
@@ -1619,7 +1619,7 @@ int main(
             << "    myst <options>\n"
             << "Options :\n"
             << "    --verbose\n"
-            << "    --axes <axis format>\n"
+            << "    --axis-format <component format>\n"
             << "    --swap-xy\n"
             << "    --swap-xz\n"
             << "    --swap-yz\n"
