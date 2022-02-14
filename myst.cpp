@@ -40,6 +40,7 @@ typedef struct _SYSTEMTIME
 #include "E57Foundation.h"
 #include "E57Simple.h"
 
+#include "base.hpp"
 #include "cell.hpp"
 #include "cloud.hpp"
 #include "compression.hpp"
@@ -52,6 +53,7 @@ using namespace std;
 using namespace e57;
 using pcf::Abort;
 using pcf::GetText;
+using pcf::PrintProgress;
 using pcf::CELL;
 using pcf::CLOUD;
 using pcf::COMPONENT;
@@ -61,22 +63,30 @@ using pcf::SCAN;
 using pcf::VECTOR_3;
 using pcf::VECTOR_4;
 
-// -- VARIABLES
+// -- CONSTANTS
 
 const int64_t
     BufferPointCount = 65536;
+
+// -- VARIABLES
+
 static double
-    PointDArray[ BufferPointCount ],
-    PointAArray[ BufferPointCount ],
-    PointEArray[ BufferPointCount ],
-    PointXArray[ BufferPointCount ],
-    PointYArray[ BufferPointCount ],
-    PointZArray[ BufferPointCount ],
-    PointIArray[ BufferPointCount ];
+    PointAComponentArray[ BufferPointCount ],
+    PointDComponentArray[ BufferPointCount ],
+    PointEComponentArray[ BufferPointCount ],
+    PointIComponentArray[ BufferPointCount ],
+    PointXComponentArray[ BufferPointCount ],
+    PointYComponentArray[ BufferPointCount ],
+    PointZComponentArray[ BufferPointCount ];
+static int8_t
+    PointInvalidDaeComponentArray[ BufferPointCount ],
+    PointInvalidIComponentArray[ BufferPointCount ],
+    PointInvalidRgbComponentArray[ BufferPointCount ],
+    PointInvalidXyzComponentArray[ BufferPointCount ];
 static uint16_t
-    PointBArray[ BufferPointCount ],
-    PointGArray[ BufferPointCount ],
-    PointRArray[ BufferPointCount ];
+    PointBComponentArray[ BufferPointCount ],
+    PointGComponentArray[ BufferPointCount ],
+    PointRComponentArray[ BufferPointCount ];
 
 // -- TYPES
 
@@ -174,13 +184,7 @@ struct POINT
             << " "
             << GetText( PositionVector )
             << " "
-            << GetText( ColorVector.W )
-            << " "
-            << GetText( ColorVector.X )
-            << " "
-            << GetText( ColorVector.Y )
-            << " "
-            << GetText( ColorVector.Z )
+            << GetText( ColorVector )
             << "\n";
     }
 
@@ -406,13 +410,17 @@ struct E57_SCAN
         HasDComponent,
         HasAComponent,
         HasEComponent,
+        HasInvalidDaeComponent,
         HasXComponent,
         HasYComponent,
         HasZComponent,
+        HasInvalidXyzComponent,
         HasIComponent,
+        HasInvalidIComponent,
         HasRComponent,
         HasGComponent,
-        HasBComponent;
+        HasBComponent,
+        HasInvalidRgbComponent;
     double
         MinimumD,
         MaximumD,
@@ -456,13 +464,17 @@ struct E57_SCAN
         HasDComponent( false ),
         HasAComponent( false ),
         HasEComponent( false ),
+        HasInvalidDaeComponent( false ),
         HasXComponent( false ),
         HasYComponent( false ),
         HasZComponent( false ),
+        HasInvalidXyzComponent( false ),
         HasIComponent( false ),
+        HasInvalidIComponent( false ),
         HasRComponent( false ),
         HasGComponent( false ),
         HasBComponent( false ),
+        HasInvalidRgbComponent( false ),
         MinimumD( 0.0 ),
         MaximumD( 0.0 ),
         MinimumA( 0.0 ),
@@ -487,6 +499,20 @@ struct E57_SCAN
     }
 
     // -- INQUIRIES
+
+    bool IsValidPoint(
+        int64_t point_index
+        )
+    {
+        return
+            ( !HasInvalidDaeComponent || !PointInvalidDaeComponentArray[ point_index ])
+            && ( !HasInvalidXyzComponent || !PointInvalidXyzComponentArray[ point_index ])
+            && ( !HasInvalidIComponent || !PointInvalidIComponentArray[ point_index ])
+            && ( !HasInvalidRgbComponent || !PointInvalidRgbComponentArray[ point_index ]);
+
+    }
+
+    // ~~
 
     void Dump(
         string indentation = ""
@@ -600,13 +626,17 @@ struct E57_SCAN
         HasDComponent = Data.pointFields.sphericalRangeField;
         HasAComponent = Data.pointFields.sphericalAzimuthField;
         HasEComponent = Data.pointFields.sphericalElevationField;
+        HasInvalidDaeComponent = Data.pointFields.sphericalInvalidStateField;
         HasXComponent = Data.pointFields.cartesianXField;
         HasYComponent = Data.pointFields.cartesianYField;
         HasZComponent = Data.pointFields.cartesianZField;
+        HasInvalidXyzComponent = Data.pointFields.cartesianInvalidStateField;
         HasIComponent = Data.pointFields.intensityField;
+        HasInvalidIComponent = Data.pointFields.isIntensityInvalidField;
         HasRComponent = Data.pointFields.colorRedField;
         HasGComponent = Data.pointFields.colorGreenField;
         HasBComponent = Data.pointFields.colorBlueField;
+        HasInvalidRgbComponent = Data.pointFields.isColorInvalidField;
 
         MinimumD = Data.sphericalBounds.rangeMinimum;
         MaximumD = Data.sphericalBounds.rangeMaximum;
@@ -640,52 +670,52 @@ struct E57_SCAN
     {
         if ( HasDComponent )
         {
-            point.SphericalPositionVector.X = PointDArray[ point_index ];
+            point.SphericalPositionVector.X = PointDComponentArray[ point_index ];
         }
 
         if ( HasAComponent )
         {
-            point.SphericalPositionVector.Y = PointAArray[ point_index ];
+            point.SphericalPositionVector.Y = PointAComponentArray[ point_index ];
         }
 
         if ( HasEComponent )
         {
-            point.SphericalPositionVector.Z = PointEArray[ point_index ];
+            point.SphericalPositionVector.Z = PointEComponentArray[ point_index ];
         }
 
         if ( HasXComponent )
         {
-            point.PositionVector.X = PointXArray[ point_index ];
+            point.PositionVector.X = PointXComponentArray[ point_index ];
         }
 
         if ( HasYComponent )
         {
-            point.PositionVector.Y = PointYArray[ point_index ];
+            point.PositionVector.Y = PointYComponentArray[ point_index ];
         }
 
         if ( HasZComponent )
         {
-            point.PositionVector.Z = PointZArray[ point_index ];
+            point.PositionVector.Z = PointZComponentArray[ point_index ];
         }
 
         if ( HasIComponent )
         {
-            point.ColorVector.W = ( PointIArray[ point_index ] - MinimumI ) / ( MaximumI - MinimumI );
+            point.ColorVector.W = ( PointIComponentArray[ point_index ] - MinimumI ) / ( MaximumI - MinimumI );
         }
 
         if ( HasRComponent )
         {
-            point.ColorVector.X = ( PointRArray[ point_index ] - MinimumR ) / ( MaximumR - MinimumR );
+            point.ColorVector.X = ( PointRComponentArray[ point_index ] - MinimumR ) / ( MaximumR - MinimumR );
         }
 
         if ( HasGComponent )
         {
-            point.ColorVector.Y = ( PointGArray[ point_index ] - MinimumG ) / ( MaximumG - MinimumG );
+            point.ColorVector.Y = ( PointGComponentArray[ point_index ] - MinimumG ) / ( MaximumG - MinimumG );
         }
 
         if ( HasBComponent )
         {
-            point.ColorVector.Z = ( PointBArray[ point_index ] - MinimumB ) / ( MaximumB - MinimumB );
+            point.ColorVector.Z = ( PointBComponentArray[ point_index ] - MinimumB ) / ( MaximumB - MinimumB );
         }
 
         if ( HasDComponent
@@ -816,34 +846,6 @@ struct E57_CLOUD
 
     // ~~
 
-    void PrintProgress(
-        uint64_t point_index,
-        uint64_t point_count
-        )
-    {
-        uint64_t
-            point_count_divider;
-
-        if ( point_index + 1 == point_count )
-        {
-            cout << "    \r";
-        }
-        else
-        {
-            point_count_divider = point_count / 100;
-
-            if ( point_count_divider > 0 )
-            {
-                if ( point_index % point_count_divider == 0 )
-                {
-                    cout << ( point_index / point_count_divider ) << "%\r";
-                }
-            }
-        }
-    }
-
-    // ~~
-
     void TransformPoint(
         POINT & point
         )
@@ -905,7 +907,8 @@ struct E57_CLOUD
             scan_point_index;
         uint64_t
             component_count,
-            component_index;
+            component_index,
+            progress;
         ofstream
             output_file_stream;
         POINT
@@ -1033,22 +1036,23 @@ struct E57_CLOUD
                     = reader.SetUpData3DPointsData(
                           scan_index,
                           BufferPointCount,
-                          PointXArray,
-                          PointYArray,
-                          PointZArray,
-                          nullptr,
-                          PointIArray,
-                          nullptr,
-                          PointRArray,
-                          PointGArray,
-                          PointBArray,
-                          nullptr,
-                          PointDArray,
-                          PointAArray,
-                          PointEArray,
-                          nullptr
+                          PointXComponentArray,
+                          PointYComponentArray,
+                          PointZComponentArray,
+                          PointInvalidXyzComponentArray,
+                          PointIComponentArray,
+                          PointInvalidIComponentArray,
+                          PointRComponentArray,
+                          PointGComponentArray,
+                          PointBComponentArray,
+                          PointInvalidRgbComponentArray,
+                          PointDComponentArray,
+                          PointAComponentArray,
+                          PointEComponentArray,
+                          PointInvalidDaeComponentArray
                           );
 
+            progress = -1;
             scan_point_index = 0;
 
             while ( scan_point_index < MaximumScanPointCount
@@ -1058,7 +1062,8 @@ struct E57_CLOUD
                       point_index < point_count;
                       ++point_index )
                 {
-                    if ( scan_point_index < MaximumScanPointCount
+                    if ( scan->IsValidPoint( point_index )
+                         && scan_point_index < MaximumScanPointCount
                          && scan_point_index % DecimationCount == 0 )
                     {
                         scan->SetPoint( point, point_index, point_is_transformed );
@@ -1081,7 +1086,7 @@ struct E57_CLOUD
 
                     if ( !IsVerbose )
                     {
-                        PrintProgress( scan_point_index, scan->PointCount );
+                        PrintProgress( progress, scan_point_index, scan->PointCount );
                     }
 
                     ++scan_point_index;
@@ -1122,7 +1127,8 @@ struct E57_CLOUD
             scan_point_index;
         uint64_t
             component_count,
-            component_index;
+            component_index,
+            progress;
         LINK_<pcf::SCAN>
             pcf_scan;
         LINK_<pcf::CLOUD>
@@ -1277,20 +1283,20 @@ struct E57_CLOUD
                     = reader.SetUpData3DPointsData(
                           scan_index,
                           BufferPointCount,
-                          PointXArray,
-                          PointYArray,
-                          PointZArray,
-                          nullptr,
-                          PointIArray,
-                          nullptr,
-                          PointRArray,
-                          PointGArray,
-                          PointBArray,
-                          nullptr,
-                          PointDArray,
-                          PointAArray,
-                          PointEArray,
-                          nullptr
+                          PointXComponentArray,
+                          PointYComponentArray,
+                          PointZComponentArray,
+                          PointInvalidXyzComponentArray,
+                          PointIComponentArray,
+                          PointInvalidIComponentArray,
+                          PointRComponentArray,
+                          PointGComponentArray,
+                          PointBComponentArray,
+                          PointInvalidRgbComponentArray,
+                          PointDComponentArray,
+                          PointAComponentArray,
+                          PointEComponentArray,
+                          PointInvalidDaeComponentArray
                           );
 
             scan_point_index = 0;
@@ -1302,7 +1308,8 @@ struct E57_CLOUD
                       point_index < point_count;
                       ++point_index )
                 {
-                    if ( scan_point_index < MaximumScanPointCount
+                    if ( scan.IsValidPoint( point_index )
+                         && scan_point_index < MaximumScanPointCount
                          && scan_point_index % DecimationCount == 0 )
                     {
                         scan.SetPoint( point, point_index, false );
@@ -1331,7 +1338,7 @@ struct E57_CLOUD
 
                     if ( !IsVerbose )
                     {
-                        PrintProgress( scan_point_index, scan.PointCount );
+                        PrintProgress( progress, scan_point_index, scan.PointCount );
                     }
 
                     ++scan_point_index;
