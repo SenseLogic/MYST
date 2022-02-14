@@ -1299,6 +1299,7 @@ struct E57_CLOUD
                           PointInvalidDaeComponentArray
                           );
 
+            progress = -1;
             scan_point_index = 0;
 
             while ( scan_point_index < MaximumScanPointCount
