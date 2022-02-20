@@ -51,17 +51,17 @@ typedef struct _SYSTEMTIME
 
 using namespace std;
 using namespace e57;
-using pcf::Abort;
-using pcf::GetText;
-using pcf::PrintProgress;
+using base::Abort;
+using base::GetText;
+using base::PrintProgress;
+using base::LINK_;
+using base::VECTOR_3;
+using base::VECTOR_4;
 using pcf::CELL;
 using pcf::CLOUD;
 using pcf::COMPONENT;
 using pcf::COMPRESSION;
-using pcf::LINK_;
 using pcf::SCAN;
-using pcf::VECTOR_3;
-using pcf::VECTOR_4;
 
 // -- CONSTANTS
 
