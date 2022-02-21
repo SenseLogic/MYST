@@ -1,4 +1,4 @@
-cd xerces-c-3.2.3
+cd XERCES\xerces-c-3.2.3
 del /s /q BUILD\*.*
 rmdir /s /q BUILD
 mkdir BUILD
