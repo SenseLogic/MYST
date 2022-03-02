@@ -23,12 +23,16 @@ myst [options]
 --position-scaling <x> <y> <z> : set the loading position scaling
 --position-rotation <x> <y> <z> : set the loading position rotation
 --position-translation <x> <y> <z> : set the loading position translation
---color-offset <r> <g> <b> <i> : set the loading color offset
---color-scaling <r> <g> <b> <i> : set the loading color scaling
---color-translation <r> <g> <b> <i> : set the loading color translation
---scan-count <maximum scan count>
---point-count <maximum scan point count>
---decimation <decimation count>
+--color-offset <r> <g> <b> : set the loading color offset
+--color-scaling <r> <g> <b> : set the loading color scaling
+--color-translation <r> <g> <b> : set the loading color translation
+--intensity-offset <i> : set the loading intensity offset
+--intensity-scaling <i> : set the loading intensity scaling
+--intensity-translation <i> : set the loading intensity translation
+--apply-intensity : apply the intensity to the color components
+--point-decimation <decimation count> : decimate points
+--ignore-scan <scan name> : ignore a scan
+--select-scan <scan name> : select a scan
 --read-e57-cloud <file path> : read an E57 point cloud
 --write-xyz-cloud <file path> <component format> : write an XYZ point cloud
 --write-pts-cloud <file path> <component format> : write a PTS point cloud

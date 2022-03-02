@@ -107,6 +107,8 @@ struct TRANSFORM
         ColorOffsetVector,
         ColorScalingVector,
         ColorTranslationVector;
+    bool
+        AppliesIntensity;
 
     // -- CONSTRUCTORS
 
@@ -121,7 +123,8 @@ struct TRANSFORM
         PositionTranslationVector( 0.0, 0.0, 0.0 ),
         ColorOffsetVector( 0.0, 0.0, 0.0, 0.0 ),
         ColorScalingVector( 1.0, 1.0, 1.0, 1.0 ),
-        ColorTranslationVector( 0.0, 0.0, 0.0, 0.0 )
+        ColorTranslationVector( 0.0, 0.0, 0.0, 0.0 ),
+        AppliesIntensity( false )
     {
     }
 };
@@ -376,6 +379,18 @@ struct POINT
             transform.ColorTranslationVector.W
             );
 
+        if ( transform.AppliesIntensity )
+        {
+            transformed_point.ColorVector.Scale(
+                transformed_point.ColorVector.W,
+                transformed_point.ColorVector.W,
+                transformed_point.ColorVector.W,
+                1.0
+                );
+        }
+
+        transformed_point.ColorVector.Clamp( 0.0, 1.0 );
+
         return transformed_point;
     }
 };
@@ -601,16 +616,25 @@ struct E57_SCAN
             IsColumnIndex
             );
 
+        cout
+            << "Scan "
+            << scan_index
+            << " : "
+            << Data.name
+            << " ("
+            << PointCount
+            << " points, "
+            << ColumnCount
+            << " rows, "
+            << ColumnCount
+            << " columns)\n";
+
         if ( RowCount == 0
              && ColumnCount == 0
              && PointCount > 0 )
         {
             RowCount = 1;
             ColumnCount = PointCount;
-        }
-        else if ( RowCount * ColumnCount != PointCount )
-        {
-            cerr << "*** WARNING : " << PointCount << " points (" << ( RowCount * ColumnCount ) << ")\n";
         }
 
         Name = Data.name;
@@ -755,15 +779,19 @@ struct E57_CLOUD
     string
         AxisFormat;
     bool
-        HasTransform;
+        IntensityIsApplied,
+        PointIsTransformed;
     TRANSFORM
         Transform;
+    vector<string>
+        IgnoredScanNameVector,
+        SelectedScanNameVector;
     vector<E57_SCAN>
         ScanVector;
     int64_t
         MaximumScanCount,
         MaximumScanPointCount,
-        DecimationCount;
+        PointDecimationCount;
     bool
         IsVerbose;
 
@@ -772,12 +800,13 @@ struct E57_CLOUD
     E57_CLOUD(
         ) :
         AxisFormat( "XYZ" ),
-        HasTransform( false ),
+        IntensityIsApplied( false ),
+        PointIsTransformed( false ),
         Transform(),
+        IgnoredScanNameVector(),
+        SelectedScanNameVector(),
         ScanVector(),
-        MaximumScanCount( 9223372036854775807L ),
-        MaximumScanPointCount( 9223372036854775807L ),
-        DecimationCount( 1 ),
+        PointDecimationCount( 1 ),
         IsVerbose( false )
     {
     }
@@ -855,7 +884,7 @@ struct E57_CLOUD
             point.Dump();
         }
 
-        if ( HasTransform )
+        if ( PointIsTransformed )
         {
             point = point.GetTransformedPoint( Transform );
 
@@ -878,15 +907,80 @@ struct E57_CLOUD
 
         scan_point_count = e57_scan.PointCount;
 
-        if ( scan_point_count > MaximumScanPointCount )
+        return scan_point_count / PointDecimationCount;
+    }
+
+    // ~~
+
+    bool IsSelectedScan(
+        const E57_SCAN & e57_scan
+        )
+    {
+        uint64_t
+            ignored_scan_name_index,
+            selected_scan_name_index;
+
+        for ( ignored_scan_name_index = 0;
+              ignored_scan_name_index < IgnoredScanNameVector.size();
+              ++ignored_scan_name_index )
         {
-            scan_point_count = MaximumScanPointCount;
+            if ( e57_scan.Name == IgnoredScanNameVector[ ignored_scan_name_index ] )
+            {
+                return false;
+            }
         }
 
-        return scan_point_count / DecimationCount;
+        if ( SelectedScanNameVector.size() > 0 )
+        {
+            for ( selected_scan_name_index = 0;
+                  selected_scan_name_index < SelectedScanNameVector.size();
+                  ++selected_scan_name_index )
+            {
+                if ( e57_scan.Name == SelectedScanNameVector[ selected_scan_name_index ] )
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        else
+        {
+            return true;
+        }
     }
 
     // -- OPERATIONS
+
+
+    void ListScans(
+        const string & input_file_path
+        )
+    {
+        int32_t
+            scan_count,
+            scan_index;
+        E57_SCAN
+            scan;
+
+        cout << "Reading file : " << input_file_path << "\n";
+
+        Reader
+            reader( input_file_path );
+
+        scan_count = reader.GetData3DCount();
+
+        cout << "ScanCount : " << scan_count << "\n";
+
+        for ( scan_index = 0;
+              scan_index < scan_count;
+              ++scan_index )
+        {
+            scan.ReadData( reader, scan_index );
+        }
+    }
+
+    // ~~
 
     void WriteXyzFile(
         const string & input_file_path,
@@ -931,14 +1025,16 @@ struct E57_CLOUD
         point_count = 0;
 
         for ( scan_index = 0;
-              scan_index < scan_count
-              && scan_index < MaximumScanCount;
+              scan_index < scan_count;
               ++scan_index )
         {
             scan = &ScanVector[ scan_index ];
             scan->ReadData( reader, scan_index );
 
-            point_count += GetScanPointCount( *scan );
+            if ( IsSelectedScan( *scan ) )
+            {
+                point_count += GetScanPointCount( *scan );
+            }
         }
 
         cout << "Writing file : " << output_file_path << "\n";
@@ -951,151 +1047,151 @@ struct E57_CLOUD
         }
 
         for ( scan_index = 0;
-              scan_index < scan_count
-              && scan_index < MaximumScanCount;
+              scan_index < scan_count;
               ++scan_index )
         {
             scan = &ScanVector[ scan_index ];
 
-            cout << "Scan[" << scan_index << "] : \n";
-            scan->Dump( "    " );
-
-            if ( output_file_format == "ptx" )
+            if ( IsSelectedScan( *scan ) )
             {
-                scan_point_count = GetScanPointCount( *scan );
+                cout << "Scan[" << scan_index << "] : \n";
+                scan->Dump( "    " );
 
-                if ( scan_point_count < scan->ColumnCount * scan->RowCount )
+                if ( output_file_format == "ptx" )
                 {
-                    scan->RowCount = 1;
-                    scan->ColumnCount = scan_point_count;
+                    scan_point_count = GetScanPointCount( *scan );
+
+                    if ( scan_point_count < scan->ColumnCount * scan->RowCount )
+                    {
+                        scan->RowCount = 1;
+                        scan->ColumnCount = scan_point_count;
+                    }
+
+                    output_file_stream
+                        << scan->ColumnCount
+                        << "\n"
+                        << scan->RowCount
+                        << "\n"
+                        << scan->PositionVector.X
+                        << " "
+                        << scan->PositionVector.Y
+                        << " "
+                        << scan->PositionVector.Z
+                        << "\n"
+                        << scan->XAxisVector.X
+                        << " "
+                        << scan->XAxisVector.Y
+                        << " "
+                        << scan->XAxisVector.Z
+                        << "\n"
+                        << scan->YAxisVector.X
+                        << " "
+                        << scan->YAxisVector.Y
+                        << " "
+                        << scan->YAxisVector.Z
+                        << "\n"
+                        << scan->ZAxisVector.X
+                        << " "
+                        << scan->ZAxisVector.Y
+                        << " "
+                        << scan->ZAxisVector.Z
+                        << "\n"
+                        << scan->XAxisVector.X
+                        << " "
+                        << scan->XAxisVector.Y
+                        << " "
+                        << scan->XAxisVector.Z
+                        << " 0\n"
+                        << scan->YAxisVector.X
+                        << " "
+                        << scan->YAxisVector.Y
+                        << " "
+                        << scan->YAxisVector.Z
+                        << " 0\n"
+                        << scan->ZAxisVector.X
+                        << " "
+                        << scan->ZAxisVector.Y
+                        << " "
+                        << scan->ZAxisVector.Z
+                        << " 0\n"
+                        << scan->PositionVector.X
+                        << " "
+                        << scan->PositionVector.Y
+                        << " "
+                        << scan->PositionVector.Z
+                        << " 1\n";
+
+                    point_is_transformed = false;
+                }
+                else
+                {
+                    point_is_transformed = true;
                 }
 
-                output_file_stream
-                    << scan->ColumnCount
-                    << "\n"
-                    << scan->RowCount
-                    << "\n"
-                    << scan->PositionVector.X
-                    << " "
-                    << scan->PositionVector.Y
-                    << " "
-                    << scan->PositionVector.Z
-                    << "\n"
-                    << scan->XAxisVector.X
-                    << " "
-                    << scan->XAxisVector.Y
-                    << " "
-                    << scan->XAxisVector.Z
-                    << "\n"
-                    << scan->YAxisVector.X
-                    << " "
-                    << scan->YAxisVector.Y
-                    << " "
-                    << scan->YAxisVector.Z
-                    << "\n"
-                    << scan->ZAxisVector.X
-                    << " "
-                    << scan->ZAxisVector.Y
-                    << " "
-                    << scan->ZAxisVector.Z
-                    << "\n"
-                    << scan->XAxisVector.X
-                    << " "
-                    << scan->XAxisVector.Y
-                    << " "
-                    << scan->XAxisVector.Z
-                    << " 0\n"
-                    << scan->YAxisVector.X
-                    << " "
-                    << scan->YAxisVector.Y
-                    << " "
-                    << scan->YAxisVector.Z
-                    << " 0\n"
-                    << scan->ZAxisVector.X
-                    << " "
-                    << scan->ZAxisVector.Y
-                    << " "
-                    << scan->ZAxisVector.Z
-                    << " 0\n"
-                    << scan->PositionVector.X
-                    << " "
-                    << scan->PositionVector.Y
-                    << " "
-                    << scan->PositionVector.Z
-                    << " 1\n";
+                CompressedVectorReader
+                    compressed_vector_reader
+                        = reader.SetUpData3DPointsData(
+                              scan_index,
+                              BufferPointCount,
+                              PointXComponentArray,
+                              PointYComponentArray,
+                              PointZComponentArray,
+                              PointInvalidXyzComponentArray,
+                              PointIComponentArray,
+                              PointInvalidIComponentArray,
+                              PointRComponentArray,
+                              PointGComponentArray,
+                              PointBComponentArray,
+                              PointInvalidRgbComponentArray,
+                              PointDComponentArray,
+                              PointAComponentArray,
+                              PointEComponentArray,
+                              PointInvalidDaeComponentArray
+                              );
 
-                point_is_transformed = false;
-            }
-            else
-            {
-                point_is_transformed = true;
-            }
+                progress = -1;
+                scan_point_index = 0;
 
-            CompressedVectorReader
-                compressed_vector_reader
-                    = reader.SetUpData3DPointsData(
-                          scan_index,
-                          BufferPointCount,
-                          PointXComponentArray,
-                          PointYComponentArray,
-                          PointZComponentArray,
-                          PointInvalidXyzComponentArray,
-                          PointIComponentArray,
-                          PointInvalidIComponentArray,
-                          PointRComponentArray,
-                          PointGComponentArray,
-                          PointBComponentArray,
-                          PointInvalidRgbComponentArray,
-                          PointDComponentArray,
-                          PointAComponentArray,
-                          PointEComponentArray,
-                          PointInvalidDaeComponentArray
-                          );
-
-            progress = -1;
-            scan_point_index = 0;
-
-            while ( scan_point_index < MaximumScanPointCount
-                    && ( point_count = compressed_vector_reader.read() ) > 0 )
-            {
-                for ( point_index = 0;
-                      point_index < point_count;
-                      ++point_index )
+                while ( ( point_count = compressed_vector_reader.read() ) > 0 )
                 {
-                    if ( scan->IsValidPoint( point_index )
-                         && scan_point_index < MaximumScanPointCount
-                         && scan_point_index % DecimationCount == 0 )
+                    for ( point_index = 0;
+                          point_index < point_count;
+                          ++point_index )
                     {
-                        scan->SetPoint( point, point_index, point_is_transformed );
-                        TransformPoint( point );
-
-                        for ( component_index = 0;
-                              component_index < component_count;
-                              ++component_index )
+                        if ( scan->IsValidPoint( point_index )
+                             && scan_point_index % PointDecimationCount == 0 )
                         {
-                            if ( component_index > 0 )
+                            scan->SetPoint( point, point_index, point_is_transformed );
+                            TransformPoint( point );
+
+                            for ( component_index = 0;
+                                  component_index < component_count;
+                                  ++component_index )
                             {
-                                output_file_stream << " ";
+                                if ( component_index > 0 )
+                                {
+                                    output_file_stream << " ";
+                                }
+
+                                output_file_stream << point.GetComponentValue( output_component_format[ component_index ] );
                             }
 
-                            output_file_stream << point.GetComponentValue( output_component_format[ component_index ] );
+                            output_file_stream << "\n";
                         }
 
-                        output_file_stream << "\n";
-                    }
+                        if ( !IsVerbose )
+                        {
+                            PrintProgress( progress, scan_point_index, scan->PointCount );
+                        }
 
-                    if ( !IsVerbose )
-                    {
-                        PrintProgress( progress, scan_point_index, scan->PointCount );
+                        ++scan_point_index;
                     }
-
-                    ++scan_point_index;
                 }
-            }
 
-            if ( scan_point_index != scan->PointCount )
-            {
-                cerr << "*** WARNING : " << scan_point_index << " points (" << scan->PointCount << ")\n";
+                if ( scan_point_index != scan->PointCount )
+                {
+                    cerr << "*** WARNING : " << scan_point_index << " points (" << scan->PointCount << ")\n";
+                }
             }
         }
 
@@ -1156,202 +1252,202 @@ struct E57_CLOUD
         cout << "ScanCount : " << scan_count << "\n";
 
         for ( scan_index = 0;
-              scan_index < scan_count
-              && scan_count < MaximumScanCount;
+              scan_index < scan_count;
               ++scan_index )
         {
             scan.ReadData( reader, scan_index );
 
-            cout << "Scan[" << scan_index << "] : \n";
-            scan.Dump( "    " );
-
-            pcf_scan = new SCAN();
-            pcf_scan->Name = scan.Name;
-            pcf_scan->PointCount = GetScanPointCount( scan );
-            pcf_scan->ColumnCount = scan.ColumnCount;
-            pcf_scan->RowCount = scan.RowCount;
-            pcf_scan->PositionVector = scan.PositionVector;
-            pcf_scan->RotationVector = scan.RotationVector;
-            pcf_scan->SetAxisVectors();
-
-            x_component_character = 'X';
-            y_component_character = 'Y';
-            z_component_character = 'Z';
-
-            for ( component_index = 0;
-                  component_index < component_count;
-                  ++component_index )
+            if ( IsSelectedScan( scan ) )
             {
-                component_character = output_component_format[ component_index ];
+                cout << "Scan[" << scan_index << "] : \n";
+                scan.Dump( "    " );
 
-                if ( compression == COMPRESSION::None )
+                pcf_scan = new SCAN();
+                pcf_scan->Name = scan.Name;
+                pcf_scan->PointCount = GetScanPointCount( scan );
+                pcf_scan->ColumnCount = scan.ColumnCount;
+                pcf_scan->RowCount = scan.RowCount;
+                pcf_scan->PositionVector = scan.PositionVector;
+                pcf_scan->RotationVector = scan.RotationVector;
+                pcf_scan->SetAxisVectors();
+
+                x_component_character = 'X';
+                y_component_character = 'Y';
+                z_component_character = 'Z';
+
+                for ( component_index = 0;
+                      component_index < component_count;
+                      ++component_index )
                 {
-                    pcf_scan->ComponentVector.push_back(
-                        new COMPONENT( GetComponentName( component_character ), COMPRESSION::None, 32, 0.0, 0.0, 0.0 )
-                        );
-                }
-                else
-                {
-                    assert( compression == COMPRESSION::Discretization );
+                    component_character = output_component_format[ component_index ];
 
-                    if ( component_character == 'x'
-                         || component_character == 'X' )
+                    if ( compression == COMPRESSION::None )
                     {
-                        x_component_character = component_character;
+                        pcf_scan->ComponentVector.push_back(
+                            new COMPONENT( GetComponentName( component_character ), COMPRESSION::None, 32, 0.0, 0.0, 0.0 )
+                            );
+                    }
+                    else
+                    {
+                        assert( compression == COMPRESSION::Discretization );
 
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "X", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, scan.MinimumX, scan.MaximumX )
-                            );
-                    }
-                    else if ( component_character == 'y'
-                              || component_character == 'Y' )
-                    {
-                        y_component_character = component_character;
-
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "Y", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, scan.MinimumY, scan.MaximumY )
-                            );
-                    }
-                    else if ( component_character == 'z'
-                              || component_character == 'Z' )
-                    {
-                        z_component_character = component_character;
-
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "Z", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, scan.MinimumZ, scan.MaximumZ )
-                            );
-                    }
-                    else if ( component_character == 'n' )
-                    {
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "I", COMPRESSION::Discretization, 12, 1.0, -2048.0, -2048.0, 2047.0 )
-                            );
-                    }
-                    else if ( component_character == 'i' )
-                    {
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "I", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
-                            );
-                    }
-                    else if ( component_character == 'I' )
-                    {
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "I", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
-                            );
-                    }
-                    else if ( component_character == 'r' )
-                    {
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "R", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
-                            );
-                    }
-                    else if ( component_character == 'R' )
-                    {
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "R", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
-                            );
-                    }
-                    else if ( component_character == 'g' )
-                    {
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "G", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
-                            );
-                    }
-                    else if ( component_character == 'G' )
-                    {
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "G", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
-                            );
-                    }
-                    else if ( component_character == 'b' )
-                    {
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "B", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
-                            );
-                    }
-                    else if ( component_character == 'B' )
-                    {
-                        pcf_scan->ComponentVector.push_back(
-                            new COMPONENT( "B", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
-                            );
-                    }
-                }
-            }
-
-            CompressedVectorReader
-                compressed_vector_reader
-                    = reader.SetUpData3DPointsData(
-                          scan_index,
-                          BufferPointCount,
-                          PointXComponentArray,
-                          PointYComponentArray,
-                          PointZComponentArray,
-                          PointInvalidXyzComponentArray,
-                          PointIComponentArray,
-                          PointInvalidIComponentArray,
-                          PointRComponentArray,
-                          PointGComponentArray,
-                          PointBComponentArray,
-                          PointInvalidRgbComponentArray,
-                          PointDComponentArray,
-                          PointAComponentArray,
-                          PointEComponentArray,
-                          PointInvalidDaeComponentArray
-                          );
-
-            progress = -1;
-            scan_point_index = 0;
-
-            while ( scan_point_index < MaximumScanPointCount
-                    && ( point_count = compressed_vector_reader.read() ) > 0 )
-            {
-                for ( point_index = 0;
-                      point_index < point_count;
-                      ++point_index )
-                {
-                    if ( scan.IsValidPoint( point_index )
-                         && scan_point_index < MaximumScanPointCount
-                         && scan_point_index % DecimationCount == 0 )
-                    {
-                        scan.SetPoint( point, point_index, false );
-                        TransformPoint( point );
-
-                        pcf_cell
-                            = pcf_scan->GetCell(
-                                  point.GetComponentValue( x_component_character ),
-                                  point.GetComponentValue( y_component_character ),
-                                  point.GetComponentValue( z_component_character )
-                                  );
-
-                        for ( component_index = 0;
-                              component_index < component_count;
-                              ++component_index )
+                        if ( component_character == 'x'
+                             || component_character == 'X' )
                         {
-                            pcf_cell->AddComponentValue(
-                                pcf_scan->ComponentVector,
-                                component_index,
-                                point.GetComponentValue( output_component_format[ component_index ] )
+                            x_component_character = component_character;
+
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "X", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, scan.MinimumX, scan.MaximumX )
                                 );
                         }
+                        else if ( component_character == 'y'
+                                  || component_character == 'Y' )
+                        {
+                            y_component_character = component_character;
 
-                        ++( pcf_cell->PointCount );
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "Y", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, scan.MinimumY, scan.MaximumY )
+                                );
+                        }
+                        else if ( component_character == 'z'
+                                  || component_character == 'Z' )
+                        {
+                            z_component_character = component_character;
+
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "Z", COMPRESSION::Discretization, position_bit_count, position_precision, 0.0, scan.MinimumZ, scan.MaximumZ )
+                                );
+                        }
+                        else if ( component_character == 'n' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "I", COMPRESSION::Discretization, 12, 1.0, -2048.0, -2048.0, 2047.0 )
+                                );
+                        }
+                        else if ( component_character == 'i' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "I", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                                );
+                        }
+                        else if ( component_character == 'I' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "I", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                                );
+                        }
+                        else if ( component_character == 'r' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "R", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                                );
+                        }
+                        else if ( component_character == 'R' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "R", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                                );
+                        }
+                        else if ( component_character == 'g' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "G", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                                );
+                        }
+                        else if ( component_character == 'G' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "G", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                                );
+                        }
+                        else if ( component_character == 'b' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "B", COMPRESSION::Discretization, 8, 1.0 / 255.0, 0.0, 0.0, 1.0 )
+                                );
+                        }
+                        else if ( component_character == 'B' )
+                        {
+                            pcf_scan->ComponentVector.push_back(
+                                new COMPONENT( "B", COMPRESSION::Discretization, 8, 1.0, 0.0, 0.0, 255.0 )
+                                );
+                        }
                     }
-
-                    if ( !IsVerbose )
-                    {
-                        PrintProgress( progress, scan_point_index, scan.PointCount );
-                    }
-
-                    ++scan_point_index;
                 }
-            }
 
-            if ( scan_point_index != scan.PointCount )
-            {
-                cerr << "*** WARNING : " << scan_point_index << " points (" << scan.PointCount << ")\n";
-            }
+                CompressedVectorReader
+                    compressed_vector_reader
+                        = reader.SetUpData3DPointsData(
+                              scan_index,
+                              BufferPointCount,
+                              PointXComponentArray,
+                              PointYComponentArray,
+                              PointZComponentArray,
+                              PointInvalidXyzComponentArray,
+                              PointIComponentArray,
+                              PointInvalidIComponentArray,
+                              PointRComponentArray,
+                              PointGComponentArray,
+                              PointBComponentArray,
+                              PointInvalidRgbComponentArray,
+                              PointDComponentArray,
+                              PointAComponentArray,
+                              PointEComponentArray,
+                              PointInvalidDaeComponentArray
+                              );
 
-            pcf_cloud->ScanVector.push_back( pcf_scan );
+                progress = -1;
+                scan_point_index = 0;
+
+                while ( ( point_count = compressed_vector_reader.read() ) > 0 )
+                {
+                    for ( point_index = 0;
+                          point_index < point_count;
+                          ++point_index )
+                    {
+                        if ( scan.IsValidPoint( point_index )
+                             && scan_point_index % PointDecimationCount == 0 )
+                        {
+                            scan.SetPoint( point, point_index, false );
+                            TransformPoint( point );
+
+                            pcf_cell
+                                = pcf_scan->GetCell(
+                                      point.GetComponentValue( x_component_character ),
+                                      point.GetComponentValue( y_component_character ),
+                                      point.GetComponentValue( z_component_character )
+                                      );
+
+                            for ( component_index = 0;
+                                  component_index < component_count;
+                                  ++component_index )
+                            {
+                                pcf_cell->AddComponentValue(
+                                    pcf_scan->ComponentVector,
+                                    component_index,
+                                    point.GetComponentValue( output_component_format[ component_index ] )
+                                    );
+                            }
+
+                            ++( pcf_cell->PointCount );
+                        }
+
+                        if ( !IsVerbose )
+                        {
+                            PrintProgress( progress, scan_point_index, scan.PointCount );
+                        }
+
+                        ++scan_point_index;
+                    }
+                }
+
+                if ( scan_point_index != scan.PointCount )
+                {
+                    cerr << "*** WARNING : " << scan_point_index << " points (" << scan.PointCount << ")\n";
+                }
+
+                pcf_cloud->ScanVector.push_back( pcf_scan );
+            }
         }
 
         cout << "Writing file : " << output_file_path << "\n";
@@ -1406,7 +1502,7 @@ int main(
             else if ( argument_count >= 1
                       && !strcmp( argument_array[ 0 ], "--swap-xy" ) )
             {
-                cloud.HasTransform = true;
+                cloud.PointIsTransformed = true;
                 cloud.Transform.SwapsXY = true;
 
                 argument_count -= 1;
@@ -1415,7 +1511,7 @@ int main(
             else if ( argument_count >= 1
                       && !strcmp( argument_array[ 0 ], "--swap-xz" ) )
             {
-                cloud.HasTransform = true;
+                cloud.PointIsTransformed = true;
                 cloud.Transform.SwapsXZ = true;
 
                 argument_count -= 1;
@@ -1424,7 +1520,7 @@ int main(
             else if ( argument_count >= 1
                       && !strcmp( argument_array[ 0 ], "--swap-yz" ) )
             {
-                cloud.HasTransform = true;
+                cloud.PointIsTransformed = true;
                 cloud.Transform.SwapsYZ = true;
 
                 argument_count -= 1;
@@ -1433,7 +1529,7 @@ int main(
             else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--position-offset" ) )
             {
-                cloud.HasTransform = true;
+                cloud.PointIsTransformed = true;
                 cloud.Transform.PositionOffsetVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.PositionOffsetVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.PositionOffsetVector.Z = stof( argument_array[ 3 ] );
@@ -1444,7 +1540,7 @@ int main(
             else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--position-scaling" ) )
             {
-                cloud.HasTransform = true;
+                cloud.PointIsTransformed = true;
                 cloud.Transform.PositionScalingVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.PositionScalingVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.PositionScalingVector.Z = stof( argument_array[ 3 ] );
@@ -1455,7 +1551,7 @@ int main(
             else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--position-rotation" ) )
             {
-                cloud.HasTransform = true;
+                cloud.PointIsTransformed = true;
                 cloud.Transform.PositionRotationVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.PositionRotationVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.PositionRotationVector.Z = stof( argument_array[ 3 ] );
@@ -1466,7 +1562,7 @@ int main(
             else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--position-translation" ) )
             {
-                cloud.HasTransform = true;
+                cloud.PointIsTransformed = true;
                 cloud.Transform.PositionTranslationVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.PositionTranslationVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.PositionTranslationVector.Z = stof( argument_array[ 3 ] );
@@ -1474,62 +1570,96 @@ int main(
                 argument_count -= 4;
                 argument_array += 4;
             }
-            else if ( argument_count >= 5
+            else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--color-offset" ) )
             {
-                cloud.HasTransform = true;
+                cloud.PointIsTransformed = true;
                 cloud.Transform.ColorOffsetVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.ColorOffsetVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.ColorOffsetVector.Z = stof( argument_array[ 3 ] );
-                cloud.Transform.ColorOffsetVector.W = stof( argument_array[ 4 ] );
 
-                argument_count -= 5;
-                argument_array += 5;
+                argument_count -= 4;
+                argument_array += 4;
             }
-            else if ( argument_count >= 2
+            else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--color-scaling" ) )
             {
-                cloud.HasTransform = true;
+                cloud.PointIsTransformed = true;
                 cloud.Transform.ColorScalingVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.ColorScalingVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.ColorScalingVector.Z = stof( argument_array[ 3 ] );
-                cloud.Transform.ColorScalingVector.W = stof( argument_array[ 4 ] );
 
-                argument_count -= 5;
-                argument_array += 5;
+                argument_count -= 4;
+                argument_array += 4;
             }
-            else if ( argument_count >= 2
+            else if ( argument_count >= 4
                       && !strcmp( argument_array[ 0 ], "--color-translation" ) )
             {
-                cloud.HasTransform = true;
+                cloud.PointIsTransformed = true;
                 cloud.Transform.ColorTranslationVector.X = stof( argument_array[ 1 ] );
                 cloud.Transform.ColorTranslationVector.Y = stof( argument_array[ 2 ] );
                 cloud.Transform.ColorTranslationVector.Z = stof( argument_array[ 3 ] );
-                cloud.Transform.ColorTranslationVector.W = stof( argument_array[ 4 ] );
 
-                argument_count -= 5;
-                argument_array += 5;
+                argument_count -= 4;
+                argument_array += 4;
             }
             else if ( argument_count >= 2
-                      && !strcmp( argument_array[ 0 ], "--scan-count" ) )
+                      && !strcmp( argument_array[ 0 ], "--intensity-offset" ) )
             {
-                cloud.MaximumScanCount = stoi( argument_array[ 1 ] );
-
-                argument_count -= 2;
-                argument_array += 2;
-            }
-            else if ( argument_count >= 2
-                      && !strcmp( argument_array[ 0 ], "--point-count" ) )
-            {
-                cloud.MaximumScanPointCount = stoi( argument_array[ 1 ] );
+                cloud.PointIsTransformed = true;
+                cloud.Transform.ColorOffsetVector.W = stof( argument_array[ 1 ] );
 
                 argument_count -= 2;
                 argument_array += 2;
             }
             else if ( argument_count >= 2
-                      && !strcmp( argument_array[ 0 ], "--decimation" ) )
+                      && !strcmp( argument_array[ 0 ], "--intensity-scaling" ) )
             {
-                cloud.DecimationCount = stoi( argument_array[ 1 ] );
+                cloud.PointIsTransformed = true;
+                cloud.Transform.ColorScalingVector.W = stof( argument_array[ 1 ] );
+
+                argument_count -= 2;
+                argument_array += 2;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--intensity-translation" ) )
+            {
+                cloud.PointIsTransformed = true;
+                cloud.Transform.ColorTranslationVector.W = stof( argument_array[ 1 ] );
+
+                argument_count -= 2;
+                argument_array += 2;
+            }
+            else if ( argument_count >= 1
+                      && !strcmp( argument_array[ 0 ], "--apply-intensity" ) )
+            {
+                cloud.PointIsTransformed = true;
+                cloud.Transform.AppliesIntensity = true;
+
+
+                argument_count -= 1;
+                argument_array += 1;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--ignore-scan" ) )
+            {
+                cloud.IgnoredScanNameVector.push_back( argument_array[ 1 ] );
+
+                argument_count -= 2;
+                argument_array += 2;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--select-scan" ) )
+            {
+                cloud.SelectedScanNameVector.push_back( argument_array[ 1 ] );
+
+                argument_count -= 2;
+                argument_array += 2;
+            }
+            else if ( argument_count >= 2
+                      && !strcmp( argument_array[ 0 ], "--point-decimation" ) )
+            {
+                cloud.PointDecimationCount = stoi( argument_array[ 1 ] );
 
                 argument_count -= 2;
                 argument_array += 2;
@@ -1541,6 +1671,16 @@ int main(
 
                 argument_count -= 2;
                 argument_array += 2;
+            }
+            else if ( argument_count >= 1
+                      && !strcmp( argument_array[ 0 ], "--list-scans" ) )
+            {
+                cloud.ListScans(
+                    file_path
+                    );
+
+                argument_count -= 1;
+                argument_array += 1;
             }
             else if ( argument_count >= 3
                       && !strcmp( argument_array[ 0 ], "--write-xyz-cloud" ) )
@@ -1631,6 +1771,7 @@ int main(
             << "    --swap-xy\n"
             << "    --swap-xz\n"
             << "    --swap-yz\n"
+            << "    --apply-intensity\n"
             << "    --position-offset <x> <y> <z>\n"
             << "    --position-scaling <x> <y> <z>\n"
             << "    --position-rotation <x> <y> <z>\n"
@@ -1638,14 +1779,20 @@ int main(
             << "    --color-offset <r> <g> <b> <i>\n"
             << "    --color-scaling <r> <g> <b> <i>\n"
             << "    --color-translation <r> <g> <b> <i>\n"
-            << "    --scan-count <maximum scan count>\n"
-            << "    --point-count <maximum scan point count>\n"
-            << "    --decimation <decimation count>\n"
+            << "    --intensity-offset <i>\n"
+            << "    --intensity-scaling <i>\n"
+            << "    --intensity-translation <i>\n"
+            << "    --apply-intensity\n"
+            << "    --ignore-scan <scan name>\n"
+            << "    --select-scan <scan name>\n"
+            << "    --point-decimation <point decimation count>\n"
             << "    --read-e57-cloud <file path>\n"
             << "    --write-xyz-cloud <file path> <component format>\n"
             << "    --write-pts-cloud <file path> <component format>\n"
             << "    --write-ptx-cloud <file path> <component format>\n"
             << "    --write-pcf-cloud <file path> <component format> <position bit count> <position precision>\n";
+
+
 
         return -1;
     }
