@@ -82,6 +82,14 @@ B : blue (from 0 to 255)
 *   [Xerces 3.2.3](https://downloads.apache.org/xerces/c/3/sources/xerces-c-3.2.3.zip)
 *   [PCF](https://github.com/senselogic/PCF/tree/master/CODE/CPP)
 
+## Examples
+
+```bash
+myst --progress --read-e57-cloud cloud.e57 --write-xyz-cloud cloud.xyz XYZRGB
+myst --progress --read-e57-cloud cloud.e57 --write-pts-cloud cloud.pts XYZRGB
+myst --progress --read-e57-cloud cloud.e57 --write-pcf-cloud cloud.pcf XYZRGB 8 0.001
+```
+
 ## Version
 
 0.3

@@ -87,6 +87,9 @@ static uint16_t
     PointBComponentArray[ BufferPointCount ],
     PointGComponentArray[ BufferPointCount ],
     PointRComponentArray[ BufferPointCount ];
+static bool
+    VerboseOptionIsEnabled,
+    ProgressOptionIsEnabled;
 
 // -- TYPES
 
@@ -792,8 +795,6 @@ struct E57_CLOUD
         MaximumScanCount,
         MaximumScanPointCount,
         PointDecimationCount;
-    bool
-        IsVerbose;
 
     // -- CONSTRUCTORS
 
@@ -806,8 +807,7 @@ struct E57_CLOUD
         IgnoredScanNameVector(),
         SelectedScanNameVector(),
         ScanVector(),
-        PointDecimationCount( 1 ),
-        IsVerbose( false )
+        PointDecimationCount( 1 )
     {
     }
 
@@ -879,7 +879,7 @@ struct E57_CLOUD
         POINT & point
         )
     {
-        if ( IsVerbose )
+        if ( VerboseOptionIsEnabled )
         {
             point.Dump();
         }
@@ -888,7 +888,7 @@ struct E57_CLOUD
         {
             point = point.GetTransformedPoint( Transform );
 
-            if ( IsVerbose )
+            if ( VerboseOptionIsEnabled )
             {
                 cout << "=> ";
                 point.Dump();
@@ -1179,7 +1179,7 @@ struct E57_CLOUD
                             output_file_stream << "\n";
                         }
 
-                        if ( !IsVerbose )
+                        if ( ProgressOptionIsEnabled )
                         {
                             PrintProgress( progress, scan_point_index, scan->PointCount );
                         }
@@ -1432,7 +1432,7 @@ struct E57_CLOUD
                             ++( pcf_cell->PointCount );
                         }
 
-                        if ( !IsVerbose )
+                        if ( ProgressOptionIsEnabled )
                         {
                             PrintProgress( progress, scan_point_index, scan.PointCount );
                         }
@@ -1452,7 +1452,7 @@ struct E57_CLOUD
 
         cout << "Writing file : " << output_file_path << "\n";
 
-        if ( IsVerbose )
+        if ( VerboseOptionIsEnabled )
         {
             pcf_cloud->Dump();
         }
@@ -1473,6 +1473,9 @@ int main(
     E57_CLOUD
         cloud;
 
+    VerboseOptionIsEnabled = false;
+    ProgressOptionIsEnabled = false;
+
     --argument_count;
     ++argument_array;
 
@@ -1485,7 +1488,15 @@ int main(
             if ( argument_count >= 1
                  && !strcmp( argument_array[ 0 ], "--verbose" ) )
             {
-                cloud.IsVerbose = true;
+                VerboseOptionIsEnabled = true;
+
+                argument_count -= 1;
+                argument_array += 1;
+            }
+            else if ( argument_count >= 1
+                 && !strcmp( argument_array[ 0 ], "--progress" ) )
+            {
+                ProgressOptionIsEnabled = true;
 
                 argument_count -= 1;
                 argument_array += 1;
@@ -1767,6 +1778,7 @@ int main(
             << "    myst <options>\n"
             << "Options :\n"
             << "    --verbose\n"
+            << "    --progress\n"
             << "    --axis-format <component format>\n"
             << "    --swap-xy\n"
             << "    --swap-xz\n"
@@ -1791,8 +1803,6 @@ int main(
             << "    --write-pts-cloud <file path> <component format>\n"
             << "    --write-ptx-cloud <file path> <component format>\n"
             << "    --write-pcf-cloud <file path> <component format> <position bit count> <position precision>\n";
-
-
 
         return -1;
     }
